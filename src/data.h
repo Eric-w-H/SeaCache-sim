@@ -6,13 +6,14 @@
 #include <unordered_set>
 #include <vector>
 
-static const int MAXN = 4000000;
+static const int MAXN = 3000000;
 
 // input matrix size and number of non-zero elements
 extern int N, M, nzA, nzB;
 
 // sparse matrices A, B and their transposes Ac, Bc
 extern std::vector<int> A[MAXN], Ac[MAXN];
+extern std::vector<int> sparchA[MAXN], sparchAi[MAXN];
 extern std::vector<int> B[MAXN], Bc[MAXN];
 
 // store the offsets for A, Ac, B, Bc
@@ -22,9 +23,9 @@ extern int offsetarrayB[MAXN], offsetarrayBc[MAXN];
 // sample matrix
 extern int SI, SK;
 extern std::vector<int> SA[MAXN];
-extern std::vector<double> SAc[MAXN];
+extern std::vector<int> SAc[MAXN];
 extern std::vector<int> SBc[MAXN];
-extern std::vector<double> SB[MAXN];
+extern std::vector<int> SB[MAXN];
 extern int SAindex[MAXN], SBcindex[MAXN];
 
 // Read input matrices A and B from files

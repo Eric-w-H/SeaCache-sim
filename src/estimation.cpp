@@ -566,6 +566,9 @@ void getParameter() {
   }
 
   printf("MAC: %lld   nnzC: %lld\n", estEffMAC, estnnzC);
+
+  return;
+
   nnzCTk[0] = estnnzC;
 
   // calculate nnzCTk

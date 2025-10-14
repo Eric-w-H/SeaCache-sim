@@ -1291,7 +1291,6 @@ void pre_load_B() {
       }
 
       // update the IP dynamic here
-      // IPTODO !!!
       if (ISDYNAMICK) {
 
         // dynamic growing if the buffer is not full!
@@ -1585,8 +1584,8 @@ void get_B_fiber(int jj, int ii) {
   // address in cache mode is : fiberid + (relative << bias)  where relative =
   // (relative coordinate in fiber)/CACHEBLOCK
   else {
-    int fibersize = currsizeB[jj] * 3 + 2;
-    cacheAccessFiber(jj, fibersize);
+    int fibersize = currsizeB[jj] * 3 + 1;
+    cacheAccessFiber(jj, fibersize, ii);
   }
 }
 
@@ -1663,6 +1662,15 @@ void get_A_fiber_col(int jj) {
 
       computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
                            sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
+
+      if (cacheScheme == 11100) {
+        // double A access in static FLRU scheme
+        computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
+        computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
+
+        computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
+                             sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
+      }
     }
   } else {
 
@@ -1690,6 +1698,11 @@ void get_A_fiber(int ii) {
     if (fulltagA == 0 || ii < fullA) {
       // hit
       computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
+
+      if (cacheScheme == 11100) {
+        // double A access in static FLRU scheme
+        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
+      }
     } else {
       computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
       computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
@@ -1697,6 +1710,15 @@ void get_A_fiber(int ii) {
 
       computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
                            sramWriteBandwidth(currsizeA[ii] * 3 + 2);
+
+      if (cacheScheme == 11100) {
+        // double A access in static FLRU scheme
+        computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
+        computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
+
+        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
+                             sramWriteBandwidth(currsizeA[ii] * 3 + 2);
+      }
     }
   } else {
 
@@ -1770,6 +1792,7 @@ void updateCAccess(int ii) {
 
       for (int i = TI; i < TI + iii; i++) {
         bufferedC[i].clear();
+        bufferedC[i] = std::set<int>();
         bufferedClen[i] = 0;
       }
     }
@@ -1818,6 +1841,7 @@ void get_B_fibers(int ii) {
       get_B_fiber(jj, ii);
 
       computePE += currsizeB[jj];
+      elements_processed_since_last_adjustment += currsizeB[jj];
 
       update_c_fiber(jj);
 
@@ -1839,6 +1863,9 @@ void get_B_fibers(int ii) {
         if (fulltagA == 0 || ii < fullA) {
           // hit
           computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
+          if (cacheScheme == 11100) {
+            computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
+          }
         } else {
           computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
           computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
@@ -1846,6 +1873,13 @@ void get_B_fibers(int ii) {
 
           computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
                                sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+
+          if (cacheScheme == 11100) {
+            computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
+            computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
+            computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
+                                 sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+          }
         }
       } else {
         computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
@@ -1854,6 +1888,14 @@ void get_B_fibers(int ii) {
 
         computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
                              sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+
+        if (cacheScheme == 11100) {
+          computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
+          computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
+
+          computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
+                               sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+        }
       }
 
     } else {
@@ -1878,7 +1920,31 @@ void get_B_fibers(int ii) {
   }
 }
 
-void prefetchrow(int ii) {
+// prefetchSize: the size of the buffer allocated for prefetch
+// prefetchNow: the current prefetch size (must < prefetchSize)
+// prefetchRowNow: row of the current(next) prefetch position
+int prefetchSize = 500;
+int prefetchNow = 0;
+int prefetchRowNow = 0;
+
+bool prefetchrow(int ii) {
+
+  int needsize;
+  // FLRU mode; need 2data+1coord+1next pointer (*4)
+  if (cacheScheme == 6 || cacheScheme == 7) {
+    needsize = currsizeA[ii] * 4 + 1;
+  }
+  // FLFU mode; don't need next pointer (*3)
+  if (cacheScheme == 66 || cacheScheme == 88) {
+    needsize = currsizeA[ii] * 3;
+  }
+
+  // can't prefetch this row now
+  if (prefetchNow + needsize >= prefetchSize) {
+    return 0;
+  }
+
+  prefetchNow += needsize;
 
   int tmpj = beginA[ii];
   int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
@@ -1888,13 +1954,360 @@ void prefetchrow(int ii) {
     // in this prefetch: push the next access queue of jj a ii
     int jj = A[ii][tmpj];
 
+    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
+        cacheScheme == 11101) {
+      nextposvector[jj].push(-ii);
+    }
+    if (cacheScheme == 66) {
+      LFUtag[jj]++;
+    }
+
+    // practical flfu. update in the flubit
+    if (cacheScheme == 88) {
+
+      long long firstaddr = getCacheAddr(jj, 0);
+      int fibersize = currsizeB[jj] * 3;
+      for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHEBLOCK) {
+        long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHEBLOCK);
+
+        int _set = getSet2(tmpaddr);
+        int _tag = getTag2(tmpaddr);
+
+        bool needhalf = 0;
+        bool incache = 0;
+
+        prefetch_increments++;
+
+        for (int i = 0; i < SETASSOC; i++) {
+          if (Valid[_set][i] && (Tag[_set][i] == _tag)) {
+
+            // not the first, need to check orig
+            if (tmpcurr != 0) {
+              if (PosOrig[_set][i] != getOrig(firstaddr)) {
+                // not the same orig
+                continue;
+              }
+            } else {
+              if (PosOrig[_set][i] != 0) {
+                continue;
+              }
+            }
+            // hit
+            incache = 1;
+            lfubit[_set][i]++;
+            // if the updated flfu bit overflow
+            if (lfubit[_set][i] > LFUmax) {
+              needhalf = 1;
+            }
+            break;
+          }
+        }
+
+        if (useVirtualTag) {
+          // not in cache, considering the virtual tag
+          if (!incache) {
+            bool invirtualtag = 0;
+            for (int i = 0; i < VIRTUALSETASSOC; i++) {
+              if (virtualValid[_set][i]) {
+                if (virtualTag[_set][i] == _tag) {
+                  // in virtual
+                  invirtualtag = 1;
+                  virtuallfubit[_set][i]++;
+                  if (virtuallfubit[_set][i] > LFUmax) {
+                    needhalf = 1;
+                  }
+                  // if find a matched, don't need to check others
+                  break;
+                }
+
+              } else {
+              }
+            }
+            if (!invirtualtag) {
+
+              bool hasinvalid = 0;
+              for (int i = 0; i < VIRTUALSETASSOC; i++) {
+                if (virtualValid[_set][i] == 0) {
+                  // has invalide!
+                  hasinvalid = 1;
+                  // put the slot here
+                  virtualValid[_set][i] = 1;
+                  virtualTag[_set][i] = _tag;
+                  virtuallfubit[_set][i] = 1;
+                  break;
+                }
+              }
+              bool haszero = 0;
+              if (!hasinvalid) {
+
+                for (int i = 0; i < VIRTUALSETASSOC; i++) {
+                  if (virtuallfubit[_set][i] == 0) {
+                    // find a slot = 0, replace it to the current fiber
+                    haszero = 1;
+                    virtualValid[_set][i] = 1;
+                    virtualTag[_set][i] = _tag;
+                    virtuallfubit[_set][i] = 1;
+
+                    break;
+                  }
+                }
+              }
+
+              if (hasinvalid == 0 && haszero == 0) {
+                prefetch_discards++;
+              }
+            }
+          }
+        }
+
+        // if the updated flfu overlow, half the flfubit of the whole set!
+        // both update in cache or virtual tag will cause the half
+        if (needhalf) {
+          for (int i = 0; i < SETASSOC; i++) {
+            if (Valid[_set][i]) {
+              lfubit[_set][i] /= 2;
+            }
+          }
+
+          // if use virtual tag, also need to half the virtual tag!
+          // 1 problem: sometimes may not 0 (halfed from 1),
+          // but is 0 now, then will be replace, but actually better
+          if (useVirtualTag) {
+            for (int i = 0; i < VIRTUALSETASSOC; i++) {
+              if (virtualValid[_set][i]) {
+                virtuallfubit[_set][i] /= 2;
+              }
+            }
+          }
+        }
+      }
+    }
+
     tmpj++;
 
     if (offsetarrayA[ii] + tmpj >= offsetarrayA[ii + 1]) {
       break;
     }
   }
+
+  return 1;
 }
+
+void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
+                                  int T_J) {
+  // --- Offline Phase ---
+  double avg_nonzero_length_B;
+  if (K > 0 && T_J > 0) {
+    avg_nonzero_length_B = static_cast<double>(nnzB) / K;
+  } else {
+    avg_nonzero_length_B = 1.0;
+  }
+
+  current_prefetch_size = 1.0 / 128.0;
+
+  prefetchSize = current_prefetch_size * inputcachesize;
+  cachesize = inputcachesize - prefetchSize;
+  setSET();
+
+  sa_iteration_k = 0;
+  previous_prefetch_size = current_prefetch_size;
+  best_prefetch_size = current_prefetch_size;
+  last_iteration_data_miss_rate = 1.0;
+  best_data_miss_rate = 1.0;
+
+  adjustment_interval = estEffMAC / 500;
+  if (adjustment_interval == 0)
+    adjustment_interval = 1000;
+
+  elements_processed_since_last_adjustment = 0;
+
+  prefetch_discards = 0;
+  data_access_misses = 0;
+  data_access_hit = 0;
+  data_access_total = 0;
+}
+
+int get_num_samples(double current_temperature) {
+
+  if (current_temperature > SA_INITIAL_TEMP * 0.5) {
+    return 4;
+  } else if (current_temperature > SA_INITIAL_TEMP * 0.1) {
+    return 8;
+  } else {
+    return 16;
+  }
+}
+
+bool lastaccept = 1;
+
+double SA_FINAL_TEMP = 0.000001;
+
+bool SAstage = 0;
+
+void update_prefetch_size() {
+  double temperature = SA_INITIAL_TEMP * pow(SA_COOLING_RATE, sa_iteration_k);
+
+  int num_samples = get_num_samples(temperature);
+
+  sa_iteration_k++;
+
+  // printf("---%d %d %lf\n", sa_iteration_k, num_samples, temperature);
+
+  if ((sa_iteration_k % num_samples) != 0) {
+    return;
+  }
+
+  if (lastaccept == 0) {
+    double current_data_miss_rate =
+        1.0 - ((double)(data_access_hit) / data_access_total);
+    last_iteration_data_miss_rate = current_data_miss_rate;
+    lastaccept = 1;
+
+    double current_discard_rate;
+    if (prefetch_increments == 0) {
+      current_discard_rate = 0;
+    } else {
+      current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
+    }
+    double current_no_counter_miss_rate =
+        ((double)data_access_misses) / data_access_total;
+    // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
+    //        prefetch_discards, prefetch_increments);
+
+    previous_prefetch_size = current_prefetch_size;
+
+    if (current_discard_rate > RATE_THRESHOLD && current_data_miss_rate < 0.3) {
+      current_prefetch_size *= 0.8;
+    } else {
+      if (current_data_miss_rate >= 0.3 &&
+          current_discard_rate <= RATE_THRESHOLD) {
+        current_prefetch_size *= 1.2;
+      } else {
+        if (current_data_miss_rate >= 0.3 &&
+            current_discard_rate > RATE_THRESHOLD) {
+
+          SAstage = 1;
+          double perturbation =
+              ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 0.2;
+          current_prefetch_size *= (1.0 + perturbation);
+        }
+      }
+    }
+
+    current_prefetch_size = std::max(current_prefetch_size, 1.0 / 256.0);
+    current_prefetch_size = std::min(current_prefetch_size, 0.10);
+
+    prefetchSize = current_prefetch_size * inputcachesize;
+    cachesize = inputcachesize - prefetchSize;
+
+    elements_processed_since_last_adjustment = 0;
+    prefetch_discards = 0;
+    prefetch_increments = 0;
+    data_access_misses = 0;
+    data_access_hit = 0;
+    data_access_total = 0;
+
+    return;
+  }
+
+  double current_data_miss_rate =
+      1.0 - ((double)(data_access_hit) / data_access_total);
+
+  double delta_M = (double)((1.0 - last_iteration_data_miss_rate) -
+                            (1.0 - current_data_miss_rate)) /
+                   (1.0 - last_iteration_data_miss_rate);
+
+  bool accept_change = false;
+  if (delta_M < 0) {
+    accept_change = true;
+  } else {
+    double acceptance_prob = exp(-delta_M / temperature);
+    double random_val = static_cast<double>(rand()) / RAND_MAX;
+    // printf("%lf %lf %lf\n", temperature, acceptance_prob, random_val);
+    if (acceptance_prob > random_val) {
+      accept_change = true;
+    }
+  }
+
+  // printf("!!!!!! %d %d %lf last size: %lf  current size: %lf  last hit "
+  //        "rate:%lf    current hit rate:%lf  change:%d \n",
+  //        data_access_hit, data_access_total, current_data_miss_rate,
+  //        previous_prefetch_size, current_prefetch_size,
+  //        1.0 - last_iteration_data_miss_rate, 1.0 - current_data_miss_rate,
+  //        accept_change);
+
+  if (accept_change) {
+    last_iteration_data_miss_rate = current_data_miss_rate;
+    if (current_data_miss_rate < best_data_miss_rate) {
+      best_data_miss_rate = current_data_miss_rate;
+      best_prefetch_size = current_prefetch_size;
+    }
+    lastaccept = 1;
+  } else {
+    current_prefetch_size = previous_prefetch_size;
+
+    lastaccept = 0;
+
+    prefetchSize = current_prefetch_size * inputcachesize;
+    cachesize = inputcachesize - prefetchSize;
+    elements_processed_since_last_adjustment = 0;
+    prefetch_discards = 0;
+    prefetch_increments = 0;
+    data_access_misses = 0;
+    data_access_hit = 0;
+    data_access_total = 0;
+
+    return;
+  }
+
+  double current_discard_rate;
+  if (prefetch_increments == 0) {
+    current_discard_rate = 0;
+  } else {
+    current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
+  }
+  double current_no_counter_miss_rate =
+      ((double)data_access_misses) / data_access_total;
+  // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
+  // prefetch_discards,
+  //       prefetch_increments);
+
+  previous_prefetch_size = current_prefetch_size;
+
+  if (current_discard_rate > RATE_THRESHOLD && current_data_miss_rate < 0.3) {
+    current_prefetch_size *= 0.8;
+  } else {
+    if (current_data_miss_rate >= 0.3 &&
+        current_discard_rate <= RATE_THRESHOLD) {
+      current_prefetch_size *= 1.2;
+    } else {
+
+      if (current_data_miss_rate >= 0.3 &&
+          current_discard_rate > RATE_THRESHOLD) {
+
+        SAstage = 1;
+        double perturbation =
+            ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 1.0;
+        current_prefetch_size *= (1.0 + perturbation);
+      }
+    }
+  }
+
+  current_prefetch_size = std::max(current_prefetch_size, 1.0 / 256.0);
+  current_prefetch_size = std::min(current_prefetch_size, 0.1);
+
+  prefetchSize = current_prefetch_size * inputcachesize;
+  cachesize = inputcachesize - prefetchSize;
+
+  elements_processed_since_last_adjustment = 0;
+  prefetch_discards = 0;
+  prefetch_increments = 0;
+  data_access_misses = 0;
+  data_access_hit = 0;
+  data_access_total = 0;
+}
+
+bool adaptive_prefetch = 0;
 
 /*
 Perform calculation.
@@ -1914,15 +2327,45 @@ void calculate() {
 
   computePE = computeDramAccess = computeSramAccess = 0;
 
-  // first only for IP&Gust
-  // need to change to jj when OP
-
-  // printf("dataflow %d\n", dataflow);
   if ((dataflow == Inner) || (dataflow == Gust)) {
 
     if (dataflow == Gust) {
 
-      int prefetchsize = 8;
+      prefetchNow = 0;
+
+      // all prefetch scheme
+      if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
+          cacheScheme == 88 || cacheScheme == 11100 || cacheScheme == 11101) {
+        // reinitialize the next pointer for FLRU
+        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
+            cacheScheme == 11101) {
+          for (int j1 = TJ; j1 < TJ + jjj; j1++) {
+            if (j1 > J)
+              break;
+            while (!nextposvector[j1].empty()) {
+              nextposvector[j1].pop();
+            }
+          }
+        }
+        // reinitialize the LFU tag for FLFU
+        if (cacheScheme == 66) {
+          for (int j1 = TJ; j1 < TJ + jjj; j1++) {
+            LFUtag[j1] = 0;
+          }
+        }
+
+        // first prefill the prefetch window
+        for (int ii = 0; prefetchNow < prefetchSize && ii < iii; ii++) {
+          if (TI + ii > I)
+            break;
+
+          prefetchRowNow = TI + ii;
+          // return 0 if can't prefetch that row now
+          if (!prefetchrow(TI + ii)) {
+            break;
+          }
+        }
+      }
 
       for (int ii = 0; ii < iii; ii++) {
         if (TI + ii > I)
@@ -1931,6 +2374,44 @@ void calculate() {
         // get O(J) corresponding B (different from Gust and Inner)
         // different from other dataflow (is A-dependent)
         get_B_fibers(TI + ii);
+
+        // update the prefetch window after each row
+        // don't need to update prefetch window in static flru
+        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
+            cacheScheme == 88 || cacheScheme == 11100 || cacheScheme == 11101) {
+
+          // first minus this row's overhead
+          int needsize = 0;
+          if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11101) {
+            needsize = currsizeA[TI + ii] * 4 + 1;
+          }
+          // FLFU mode; don't need next pointer (*3)
+          if (cacheScheme == 66 || cacheScheme == 88) {
+            needsize = currsizeA[TI + ii] * 3;
+          }
+
+          if (prefetchNow > needsize) {
+            prefetchNow -= needsize;
+          }
+
+          // need to prefetch the next ii+prefetchsize+1
+          if (prefetchNow >= prefetchSize)
+            continue;
+
+          while (prefetchRowNow < TI + iii) {
+            if (!prefetchrow(prefetchRowNow)) {
+              break;
+            }
+            prefetchRowNow++;
+          }
+        }
+
+        if (adaptive_prefetch) {
+          if (elements_processed_since_last_adjustment >= adjustment_interval) {
+            update_prefetch_size();
+            elements_processed_since_last_adjustment = 0;
+          }
+        }
       }
     }
 
@@ -2144,16 +2625,29 @@ void reinitialize() {
   TI = TJ = TK = 0;
   AccessByte = 0;
 
+  totalhit = 0;
+  data_access_hit = 0;
+  totalaccess = 0;
+  data_access_total = 0;
+
   postDramAccess = postSramAccess = 0;
 
   if (ISCACHE) {
     initializeCacheValid();
+
+    if (useVirtualTag) {
+      memset(virtualValid, 0, sizeof(virtualValid));
+    }
+
+    memset(PosOrig, 0, sizeof(PosOrig));
+    memset(vPosOrig, 0, sizeof(vPosOrig));
   }
 
   // reinitialize buffer c
   Csizenow = 0;
   for (int i = 0; i < I; i++) {
     bufferedC[i].clear();
+    bufferedC[i] = std::set<int>();
     bufferedClen[i] = 0;
   }
 
@@ -2204,7 +2698,6 @@ void postTileMerge() {
   // another way to realize this is to add once read each time when we write C
   // already added in the C writing position for gust and IP
 
-  // 除了jjj != J 的情况，还需要加上buffer不够的情况： 前面offload过时！
   if (dataflow == Gust) {
     if (jjj != J) {
 
@@ -2242,6 +2735,10 @@ void postTileMerge() {
 
 void run() {
   reinitialize();
+
+  if (adaptive_prefetch) {
+    initialize_adaptive_prefetch(nzA, nzB, K, J, jjj);
+  }
 
   if (iii > I)
     iii = I;
@@ -2322,46 +2819,116 @@ void runTile(bool isest, int iii, int jjj, int kkk, long long tti,
       return;
     }
 
+    prefetchNow = 0;
+    prefetchRowNow = 0;
+
+    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
+        cacheScheme == 11101) {
+      for (int j = 0; j < J; j++) {
+        while (!nextposvector[j].empty()) {
+          nextposvector[j].pop();
+        }
+      }
+    }
+    if (cacheScheme == 66) {
+      for (int j = 0; j < J; j++) {
+        LFUtag[j] = 0;
+      }
+    }
+
     // prunning
     if (((long long)jjj * kkk) * 4 < SmallestTile) {
       return;
     }
   }
 
-  if (PartialConfig == 1) {
-    // 100% B
-    configPartial(0, 1, 0);
-    interorder = InterOrder(2); // JKI
-  }
-  if (PartialConfig == 2) {
-    // 50%B + 50%A
-    configPartial(0.5, 0.5, 0);
-    interorder = InterOrder(0); // IJK
-  }
-  if (PartialConfig == 3) {
-    // 50%B + 50%C
-    configPartial(0, 0.5, 0.5);
-    interorder = InterOrder(1); // IKJ
-  }
-  // ********* Two Dyanmic Config ***********
-  if (PartialConfig == 4) {
-    // dynamic : 100%B
-    ISDYNAMICJ = 1;
-    configPartial(0, 1, 0);
-    interorder = InterOrder(1); // IKJ
-  }
-  if (PartialConfig == 5) {
-    // dynamic: 50%B 50%C
-    ISDYNAMICJ = 1;
-    configPartial(0, 0.5, 0.5);
-    interorder = InterOrder(1); // IKJ
-  }
-  if (PartialConfig == 6) {
-    configPartial(0, 1, 0);
-    interorder = InterOrder(1); // IKJ
+  // deal with the opt metadata
+  if (ISCACHE && (cacheScheme == 6 || cacheScheme == 7)) {
+
+    cachesize = inputcachesize - prefetchSize;
+    cachesize -= kkk * 2;
+
+    if (cachesize < 0) {
+      puts("!!!!!! metadata out of range!!!!!!!!!!");
+      fflush(stdout);
+      return;
+    }
+
+    setSET();
   }
 
-  int oldsize = 0;
+  if (ISCACHE && (cacheScheme == 66)) {
+
+    cachesize = inputcachesize - prefetchSize;
+
+    // LFU tag size
+    cachesize -= kkk;
+
+    if (cachesize < 0) {
+      puts("!!!!!! metadata out of range!!!!!!!!!!");
+      fflush(stdout);
+      return;
+    }
+
+    setSET();
+  }
+
+  if (ISCACHE && (cacheScheme == 88)) {
+
+    cachesize = inputcachesize - prefetchSize;
+
+    setSET();
+  }
+
+  if (!ISCACHE) {
+    if (PartialConfig == 1) {
+      // 100% B
+      configPartial(0, 1, 0);
+      interorder = InterOrder(2); // JKI
+    }
+    if (PartialConfig == 2) {
+      // 50%B + 50%A
+      configPartial(0.5, 0.5, 0);
+      interorder = InterOrder(0); // IJK
+    }
+    if (PartialConfig == 3) {
+      // 50%B + 50%C
+      configPartial(0, 0.5, 0.5);
+      interorder = InterOrder(1); // IKJ
+    }
+    // ********* Two Dyanmic Config ***********
+    if (PartialConfig == 4) {
+      // dynamic : 100%B
+      ISDYNAMICJ = 1;
+      configPartial(0, 1, 0);
+      interorder = InterOrder(1); // IKJ
+    }
+    if (PartialConfig == 5) {
+      // dynamic: 50%B 50%C
+      ISDYNAMICJ = 1;
+      configPartial(0, 0.5, 0.5);
+      interorder = InterOrder(1); // IKJ
+    }
+    if (PartialConfig == 6) {
+      configPartial(0, 1, 0);
+      interorder = InterOrder(1); // IKJ
+    }
+  }
+
+  if (ISCACHE == 1) {
+    // need to allocate extra tag space in address mode
+    // the address space is depends on the tiling size (equal to jjj)
+    // need to update: cachesize (actually Bsize?) + SET + SETLOG
+    if ((cacheScheme == 4) || (cacheScheme == 5) || (cacheScheme == 7)) {
+      // need to add back after this calculation
+      cachesize = inputcachesize;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+    }
+
+    hitcnt = 0;
+    misscnt = 0;
+  }
 
   if (!isest) {
     //  cout <<  printInterOrder[interorder];

@@ -22,12 +22,13 @@ int main(int argc, char *argv[]) {
   json config;
   file >> config;
 
-  dataflow = static_cast<DataFlow>(config["dataflow"].get<int>());
-  format = static_cast<Format>(config["format"].get<int>());
+  dataflow = Gust;
+  format = RR;
   int transpose = config["transpose"].get<int>();
-  minBlock = config["minBlock"].get<int>();
+  minBlock = 2;
   float tmpsram = config["cachesize"].get<float>();
   cachesize = tmpsram * 262144 * 0.9;
+  inputcachesize = cachesize;
   float tmpbandw = config["memorybandwidth"].get<float>();
   HBMbandwidth = (tmpbandw / 4.0) * 0.6;
   int tmpPE = config["PEcnt"].get<int>();
@@ -36,9 +37,10 @@ int main(int argc, char *argv[]) {
   HBMbandwidthperPE = HBMbandwidth / PEcnt;
   int tmpbank = config["srambank"].get<int>();
   sramBank = tmpbank;
-  ISCACHE = config["iscache"].get<int>();
-  cacheScheme = config["cacheScheme"].get<int>();
+  ISCACHE = 1;
   int baselinetest = config["baselinetest"].get<int>();
+  bool condensedOP = config["condensedOP"].get<bool>();
+  std::string tile_dir = config["tileDir"].get<std::string>();
   std::string output_dir = config["outputDir"].get<std::string>();
 
   if (!freopen(
@@ -55,11 +57,12 @@ int main(int argc, char *argv[]) {
   }
 
   if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
-                (baselinetest ? "Base_" : "HYTE_") + std::to_string(tmpsram) +
-                "MB_" + std::to_string(tmpbandw) + "GBs_" +
-                std::to_string(tmpPE) + "PEs_" + std::to_string(tmpbank) +
-                "sbanks_" + "_" + matrix_name1 + "_" + matrix_name1 + "_" +
-                printFormat[format] + "_" + (transpose ? "1" : "0") + ".txt")
+                (baselinetest ? "Base_" : "SeaCache_") +
+                std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
+                "GBs_" + std::to_string(tmpPE) + "PEs_" +
+                std::to_string(tmpbank) + "sbanks_" + "_" + matrix_name1 + "_" +
+                matrix_name1 + "_" + printFormat[format] + "_" +
+                (transpose ? "1" : "0") + ".txt")
                    .c_str(),
                "w", stdout)) {
     std::cerr << "Error opening output folder." << std::endl;
@@ -85,18 +88,8 @@ int main(int argc, char *argv[]) {
   printf("Matrix A: %d x %d, number of non-zeros = %d\n", N, M, nzA);
   fflush(stdout);
 
-  // samplek = 100;
-  // samplep = 0.1;
-
-  samplek = sqrt(N);
-  samplep = 1.0 / samplek;
-
-  // samplek = 256;
-  // samplep = 0.0039;
-
-  if (!baselinetest) {
-    printf("samplek:%lf  samplep:%lf\n", samplek, samplep);
-  }
+  samplek = 100;
+  samplep = 0.1;
 
   I = N;
   J = M;
@@ -162,9 +155,51 @@ int main(int argc, char *argv[]) {
     sort(Ac[j].begin(), Ac[j].end());
   }
 
+  if (condensedOP) {
+    // if use the condensed OP dataflow, need to preprocess the A matrix into
+    // the condensed format first. first put the data into sparchA[], then put
+    // it back to A[], and call gust dataflow
+    for (int j = 0; j < J; j++) {
+      for (int i = 0; i < I; i++) {
+        if (A[i].size() > j) {
+          sparchA[j].push_back(A[i][j]);
+          sparchAi[j].push_back(i);
+        }
+      }
+    }
+
+    for (int j = 0; j < J; j++) {
+      A[j].clear();
+      for (int i = 0; i < sparchA[j].size(); i++) {
+        A[j].push_back(sparchA[j][i]);
+      }
+    }
+  }
+
+  long long totalempty = 0;
+
+  long long totalincache = 0;
+
+  long long totaltagmatch48 = 0;
+  long long totaltagmatch16 = 0;
+
   for (int i = 1; i <= I + 2; i++) {
     offsetarrayA[i] = offsetarrayA[i - 1] + A[i - 1].size();
+    if (A[i - 1].size() < 48) {
+      totalempty += (48 - A[i - 1].size());
+    }
+    totalincache += min(48, (int)A[i - 1].size());
+    totaltagmatch48 += ((int)A[i - 1].size() + 47) / 48;
+    totaltagmatch16 += ((int)A[i - 1].size() + 15) / 16;
   }
+
+  printf("*** ratio of empty %lf, ratio of not empty %lf\n",
+         totalempty / (I * 48.0), 1 - (totalempty / (I * 48.0)));
+  printf("*** ratio of in cache %lf\n", totalincache / ((double)nzA));
+
+  printf("** ratio tag access 48 %lf\n", I / ((double)I + totaltagmatch48));
+  printf("** ratio tag access 16 %lf\n", I / ((double)I + totaltagmatch16));
+
   for (int i = 1; i <= J + 2; i++) {
     offsetarrayAc[i] = offsetarrayAc[i - 1] + Ac[i - 1].size();
   }
@@ -282,10 +317,31 @@ int main(int argc, char *argv[]) {
   }
 
   for (int j = 1; j <= J + 2; j++) {
-    offsetarrayB[j] = offsetarrayB[j - 1] + B[j - 1].size();
+    int tmplen = B[j - 1].size();
+    offsetarrayB[j] = offsetarrayB[j - 1] + tmplen;
+
+    // the actual access size
+    tmplen = tmplen * 3;
+
+    int freqj = (offsetarrayAc[j + 1] - offsetarrayAc[j]);
   }
+  // two problem:
+  // 1) this calculate way just calculate the minimum
+  // 2) the + J will change is tiling J  -> but actually long will alos change
+  // -> counteract? but the above calculate seems don't consider the emptys
+  // (larger than real) so maybe counteract
+
+  // move this to above for the weights (1 -> )
+  // shortpart += J/(CACHEBLOCKSHORT);
+
   for (int k = 1; k <= K + 2; k++) {
     offsetarrayBc[k] = offsetarrayBc[k - 1] + Bc[k - 1].size();
+  }
+
+  if (ISCACHE == 1) {
+
+    SET = cachesize / (CACHEBLOCK * SETASSOC);
+    SETLOG = getlog(SET);
   }
 
   sampleB();
@@ -297,157 +353,8 @@ int main(int argc, char *argv[]) {
   printf("I = %d, K = %d, J = %d\n", I, K, J);
   /************************************************************/
 
-  if (baselinetest) {
-
-    configPartial(0.33, 0.33, 0.33);
-    interorder = IJK;
-
-    //***********    Tailors
-    //****************************************************
-    printf("\n\nTailors *************************************\n");
-    int pbound = K;
-    int leftbound = 0; // (leftbound, k] is the current window
-    int sumnow = 0;
-
-    int Bbound = Bsize;
-
-    for (int k = 0; k < K; k++) {
-      sumnow += Bc[k].size() * 3 + 1;
-
-      while (sumnow > Bbound && leftbound < k) {
-        pbound = min(pbound, k - leftbound);
-        leftbound++;
-        sumnow -= Bc[leftbound].size() * 3 + 1;
-      }
-    }
-
-    // printf("########## pbound = %d\n", pbound);
-    // fflush(stdout);
-
-    ISDYNAMICJ = 0;
-    ISDYNAMICK = 0;
-    ISDYNAMICI = 0;
-    iii = I;
-    jjj = J;
-    kkk = pbound;
-    tti = 1;
-    ttj = 1;
-    ttk = (K + pbound - 1) / pbound;
-
-    reinitialize();
-
-    double multiples[21] = {1.0, 1.0625, 1.125, 1.25, 1.5, 2,   3,   5,
-                            9,   17,     33,    65,   129, 257, 513, 1025};
-
-    double tilesize;
-
-    for (int ib = 1; ib < 15; ib++) {
-
-      iii = I;
-      jjj = J;
-      kkk = pbound * multiples[ib];
-
-      //     printf("&& %d %d %d\n", iii, jjj, kkk);
-      fflush(stdout);
-
-      int mistilecnt = 0;
-      int totaltilecnt = 0;
-
-      for (int tktmp = 0; tktmp < K; tktmp += kkk) {
-        int sumtile = 0;
-
-        for (int kktmp = tktmp; kktmp < tktmp + kkk; kktmp++) {
-          sumtile += Bc[kktmp].size() * 3 + 1;
-        }
-
-        if (sumtile > Bbound) {
-          mistilecnt++;
-        }
-        totaltilecnt++;
-      }
-
-      //    printf("tile overflow rate is %lf\n", (double)mistilecnt /
-      //    totaltilecnt);
-
-      tilesize = K / (double)kkk;
-
-      // add this sentence when test Tailor. (to run faster)
-      if (totaltilecnt == 0)
-        break;
-      if (10 * mistilecnt > totaltilecnt)
-        break;
-      if (((double)mistilecnt / totaltilecnt) > 0.1)
-        break;
-    }
-
-    reinitialize();
-
-    configPartial(0.45, 0.5, 0.05);
-
-    printf("Choose Tiling: TI = %d, TK = %d, TJ = %d\n", iii, jjj, kkk);
-
-    runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
-
-    //***************  DRT
-    //**************************************************************
-
-    printf("\n\nDRT ************************************\n");
-    configPartial(0.05, 0.45, 0.5);
-    interorder = JKI;
-
-    double tt = sqrt(tilesize);
-
-    iii = I;
-    jjj = (int)(J / tt);
-    kkk = (int)(K / tt);
-    tti = 1;
-    ttj = (J + jjj - 1) / jjj;
-    ttk = (K + kkk - 1) / kkk;
-
-    printf("Choose Tiling: TI = %d, TK = %d, TJ = %d\n", iii, jjj, kkk);
-
-    fflush(stdout);
-
-    configPartial(0.45, 0.4, 0.05);
-
-    reinitialize();
-
-    runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
-
-    //***************Harp
-    //*************************************************************
-
-    printf("\n\nHarp ************************************\n");
-
-    configPartial(0.045, 0.91, 0.045);
-    interorder = JKI;
-
-    // change: Harp only tile I not J！
-
-    iii = (int)(I / tilesize);
-    jjj = J;
-    kkk = K;
-    tti = (I + iii - 1) / iii;
-    ttj = 1;
-    ttk = 1;
-
-    printf("Choose Tiling: TI = %d, TK = %d, TJ = %d\n", iii, jjj, kkk);
-
-    reinitialize();
-
-    configPartial(0.05, 0.9, 0.05);
-
-    runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
-
-    return 0;
-  }
-
-  //***************  HYTE
-  //********************************************************
-
-  printf("\nHYTE ******************************\n");
-
-  getParameterSample();
+  // getParameterSample();
+  getParameter();
 
   configPartial(0.05, 0.5, 0.45);
   // also calculate the pbound here as the bound of tile search
@@ -469,87 +376,199 @@ int main(int argc, char *argv[]) {
 
   long long SmallestTile = ((long long)pbound) * J;
 
-  // printf("########## pbound = %d  SmallestTile = %lld\n", pbound,
-  // SmallestTile); fflush(stdout);
-
-  // decrease jbound and kbound
-  // don't need ibound rightnow (in Gust&IP) (don't need tiling I at all)
-
   int kbound = getkbound();
   int jbound = getjbound();
   int ibound = getibound();
 
-  // use IKJ to eval dynamic
+  int usesearchedtile = 1;
+  if (usesearchedtile) {
 
-  auto time4 = std::chrono::high_resolution_clock::now();
+    ISDYNAMICJ = 0;
+    ISDYNAMICK = 0;
+    ISDYNAMICI = 0;
 
-  int interone;
-  if (dataflow == Gust || dataflow == Outer)
-    interone = 1;
-  if (dataflow == Inner)
-    interone = 0;
-  for (int tmpinter = interone; tmpinter <= interone; tmpinter++) {
+    freopen((tile_dir + matrix_name1).c_str(), "r", stdin);
+    int t_i, t_j, t_k;
+    scanf("%d%d%d", &t_i, &t_j, &t_k);
+    fclose(stdin);
 
-    interorder = InterOrder(tmpinter);
+    iii = t_i;
+    jjj = t_j;
+    kkk = t_k;
+    tti = (I + iii - 1) / iii;
+    ttj = (J + jjj - 1) / jjj;
+    ttk = (K + kkk - 1) / kkk;
 
-    tti = 1, ttk = 1, ttj = 1;
-    for (iii = I, tti = 1; iii >= ibound; iii = (iii + 1) / 2, tti *= 2) {
-      // first only change J, then only change K, finally change both J & K
+    /////////////// Baseline configurations
 
-      // only change J
-      kkk = K;
-      ttk = 1;
-      for (jjj = J, ttj = 1; jjj >= jbound; jjj = (jjj + 1) / 2, ttj *= 2) {
-        runTile(1, iii, jjj, kkk, tti, ttk, ttj, SmallestTile);
+    if (baselinetest) {
+
+      adaptive_prefetch = 0;
+
+      ////////////  InnserSP
+      // static FLRU + 16 words scheme0
+      puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      prefetchSize = inputcachesize / 6;
+      cacheScheme = 11100;
+      cachesize = inputcachesize;
+      CACHEBLOCK = 16;
+      CACHEBLOCKLOG = 4;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      fflush(stdout);
+
+      ////////////  Sparch
+      // dynamic FLRU + 128KB prefetch size + 144 words scheme0
+      puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test Sparch   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      ISCACHE = 1;
+      cacheScheme = 11101;
+      prefetchSize = inputcachesize / 6;
+      cachesize = inputcachesize - prefetchSize;
+      CACHEBLOCK = 144;
+      CACHEBLOCKLOG = 8;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+      // calculate metadata overhead.
+      // if metadata overflow, choose smaller tile
+      int keepkkk = kkk;
+      int keepttk = ttk;
+      // if can keep, just use current kkk
+      if (cachesize > kkk * 2) {
+        cachesize -= kkk * 2;
+      } else {
+        // if can't keep, use smaller kkk
+        // (make kkk*2 to be half cachesize)
+        kkk = cachesize / 4;
+        ttk = (K + kkk - 1) / kkk;
+        cachesize -= kkk * 2;
       }
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      // return to the selected tile size.
+      kkk = keepkkk;
+      ttk = keepttk;
+      // return to the default setting
+      CACHEBLOCK = 16;
+      CACHEBLOCKLOG = 4;
+      cachesize = inputcachesize;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
 
-      // only change K
-      jjj = J;
-      ttj = 1;
-      for (kkk = (K + 1) / 2, ttk = 2; kkk >= kbound;
-           kkk = (kkk + 1) / 2, ttk *= 2) {
-        runTile(1, iii, jjj, kkk, tti, ttk, ttj, SmallestTile);
-      }
+      fflush(stdout);
 
-      // change both J & K
-      for (kkk = (K + 1) / 2, ttk = 2; kkk >= kbound;
-           kkk = (kkk + 1) / 2, ttk *= 2) {
-        for (jjj = (J + 1) / 2, ttj = 2; jjj >= jbound;
-             jjj = (jjj + 1) / 2, ttj *= 2) {
+      ////////////  X-cache
+      puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test X-cache   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      // LRU + 4 words scheme0
+      // just same as using scheme0 with cacheline = 4
+      ISCACHE = 1;
+      cacheScheme = 0;
+      cachesize = inputcachesize;
+      CACHEBLOCK = 4;
+      CACHEBLOCKLOG = 2;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      // return to the default setting
+      CACHEBLOCK = 16;
+      CACHEBLOCKLOG = 4;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
 
-          runTile(1, iii, jjj, kkk, tti, ttk, ttj, SmallestTile);
-        }
-      }
+      fflush(stdout);
+
+      puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");
+      ISCACHE = 0;
+
+      configPartial(0.05, 0.9, 0.05);
+
+      reinitialize();
+
+      run();
+
+      return 0;
+    }
+
+    bool testseacache = 1;
+    if (testseacache) {
+
+      puts("\n***************** SeaCache *******************");
+
+      adaptive_prefetch = 1;
+
+      printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, K, (J + jjj - 1) / jjj,
+             nzB / (K * ((J + jjj - 1) / jjj)));
+
+      useVirtualTag = 1;
+      cacheScheme = 88;
+      cachesize = inputcachesize;
+
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      adaptive_prefetch = 0;
+      useVirtualTag = 0;
+    }
+
+    bool ablationtest = 0;
+    if (ablationtest) {
+
+      adaptive_prefetch = 0;
+
+      /////////////// ablation test
+
+      puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme0 (base)   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!");
+      puts("CacheScheme 0");
+      ISCACHE = 1;
+      cacheScheme = 0;
+      cachesize = inputcachesize;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!");
+
+      puts("CacheScheme 1");
+      ISCACHE = 1;
+      cacheScheme = 1;
+      cachesize = inputcachesize;
+      SET = cachesize / (CACHEBLOCK * SETASSOC);
+      SETLOG = getlog(SET);
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!");
+
+      useVirtualTag = 0;
+      cacheScheme = 88;
+      cachesize = inputcachesize;
+      prefetchSize = cachesize / 6;
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 with virtue   "
+           "!!!!!!!!!!!!!!!!!!!!!!!!");
+
+      puts("CacheScheme 88 practical FLFU  with virtual tag 1/6");
+      useVirtualTag = 1;
+      cacheScheme = 88;
+      cachesize = inputcachesize;
+      prefetchSize = cachesize / 6;
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      useVirtualTag = 0;
+
+      puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
+      useVirtualTag = 1;
+      cacheScheme = 88;
+      cachesize = inputcachesize;
+      prefetchSize = cachesize / 16;
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      useVirtualTag = 0;
     }
   }
-
-  auto time5 = std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<double, std::micro> elapsed = time5 - time4;
-
-  int timeSearch;
-  int timePosttune;
-
-  timeSearch = (int)(elapsed.count());
-
-  printf("time of prunned search using the cost model:%d\n", timeSearch);
-
-  printf("Choose Tiling: TI = %d, TK = %d, TJ = %d\n", estiii, estjjj, estkkk);
-
-  fflush(stdout);
-
-  reinitialize();
-  PartialConfig = 4;
-  ISDYNAMICJ = 1;
-  configPartial(0, 1, 0);
-  interorder = InterOrder(1);
-  iii = estiii;
-  jjj = estjjj;
-  kkk = estkkk;
-  tti = esttti;
-  ttj = estttj;
-  ttk = estttk;
-  runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
 
   return 0;
 }

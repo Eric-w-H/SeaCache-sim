@@ -6,6 +6,7 @@ long long gustest(int estsum);
 bool sampleP();
 
 void getParameterSample();
+void getParameter();
 
 void initsample();
 
@@ -18,5 +19,7 @@ extern int esttti, estttj, estttk;
 
 extern double ha1, hb1;
 extern double ha2, hb2;
+
+extern long long estEffMAC;
 
 #endif
