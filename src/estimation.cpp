@@ -18,7 +18,7 @@ void sampleA() {
   for (int i = 0; i <= I; i++) {
     // Be the sampled row in probability p
     if (sampleP()) {
-      for (int j = 0; j < A[i].size(); j++) {
+      for (std::size_t j = 0; j < A[i].size(); j++) {
         SA[SIcnt].push_back(A[i][j]);
         // directly push back the h1(x)!
         SAc[A[i][j]].push_back(hash1(i, ha1, hb1, pmod));
@@ -35,7 +35,7 @@ void sampleB() {
   for (int k = 0; k <= K; k++) {
     // Be the sampled row in probability p
     if (sampleP()) {
-      for (int j = 0; j < Bc[k].size(); j++) {
+      for (std::size_t j = 0; j < Bc[k].size(); j++) {
         SBc[SKcnt].push_back(Bc[k][j]);
         SB[Bc[k][j]].push_back(hash2(k, ha2, hb2, pmod));
         SBnnz++;
@@ -104,7 +104,7 @@ double tkans[128];
 
 int OutputKTJ(int lastk, int nowk, double maxh) {
 
-  int ret = 0;
+  // int ret = 0;
 
   double ans = 0;
 
@@ -360,7 +360,7 @@ void getParameterSample() {
     }
   }
 
-  double ansp = combineSF();
+  // double ansp = combineSF();
   // printf("SF!!  %lf %lf\n", ansp, samplek/ansp);
 
   auto time20 = std::chrono::high_resolution_clock::now();
@@ -773,20 +773,20 @@ long long gustest(int estsum) {
 
   esttotal += max(estpostDram / PEcnt, estpostSram / sramBank);
 
-  int estsquareiii, estsquarejjj, estsquarekkk;
-  int estsquaretti, estsquarettj, estsquarettk;
+  // int estsquareiii, estsquarejjj, estsquarekkk;
+  // int estsquaretti, estsquarettj, estsquarettk;
 
-  if (jjj == kkk) {
-    if (esttotal < estsquaremin) {
-      estsquaremin = esttotal;
-      estsquareiii = iii;
-      estsquarejjj = jjj;
-      estsquarekkk = kkk;
-      estsquaretti = tti;
-      estsquarettj = ttj;
-      estsquarettk = ttk;
-    }
-  }
+  // if (jjj == kkk) {
+  //   if (esttotal < estsquaremin) {
+  //     estsquaremin = esttotal;
+  //     estsquareiii = iii;
+  //     estsquarejjj = jjj;
+  //     estsquarekkk = kkk;
+  //     estsquaretti = tti;
+  //     estsquarettj = ttj;
+  //     estsquarettk = ttk;
+  //   }
+  // }
 
   if (esttotal < estmin) {
 
@@ -821,8 +821,12 @@ void postEstAdjust() {
 
   memset(tilecnt, 0, sizeof(tilecnt));
 
-  int iii2 = (estiii + 1) / 2, jjj2 = (estjjj + 1) / 2, kkk2 = (estkkk + 1) / 2;
-  int tti2 = esttti * 2, ttj2 = estttj * 2, ttk2 = estttk * 2;
+  // int iii2 = (estiii + 1) / 2;
+  int jjj2 = (estjjj + 1) / 2;
+  int kkk2 = (estkkk + 1) / 2;
+  // int tti2 = esttti * 2;
+  int ttj2 = estttj * 2;
+  int ttk2 = estttk * 2;
 
   for (int k = 0; k < SKcnt; k++) {
     int tmpszb = SBc[k].size();
@@ -838,7 +842,7 @@ void postEstAdjust() {
   // calculate 4 versions
 
   // J+K type0
-  int outtile = 0;
+  // int outtile = 0;
   long long estsum = 0;
   for (int tj = 0; tj < ttj; tj++) {
     for (int tk = 0; tk < ttk; tk++) {
@@ -868,7 +872,7 @@ void postEstAdjust() {
 
   // J/2+K type1
 
-  outtile = 0;
+  // outtile = 0;
   estsum = 0;
   for (int tj = 0; tj < ttj2; tj++) {
     for (int tk = 0; tk < ttk; tk++) {
@@ -898,7 +902,7 @@ void postEstAdjust() {
 
   // J+K/2 type2
 
-  outtile = 0;
+  // outtile = 0;
   estsum = 0;
   for (int tj = 0; tj < ttj; tj++) {
     for (int tk = 0; tk < ttk2; tk++) {
@@ -928,7 +932,7 @@ void postEstAdjust() {
 
   // J/2+K/2  type3
 
-  outtile = 0;
+  // outtile = 0;
   estsum = 0;
   for (int tj = 0; tj < ttj2; tj++) {
     for (int tk = 0; tk < ttk2; tk++) {

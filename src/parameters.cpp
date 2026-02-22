@@ -17,9 +17,9 @@ InterOrder interorder;
 DataFlow dataflow;
 Format format;
 
-string printInterOrder[10] = {"IJK", "IKJ", "JKI", "JIK", "KIJ", "KJI"};
-string printDataFlow[10] = {"Inner", "Outer", "Gust"};
-string printFormat[10] = {"RR", "RC", "CR", "CC", "BB"};
+string printInterOrder[] = {"IJK", "IKJ", "JKI", "JIK", "KIJ", "KJI"};
+string printDataFlow[] = {"Inner", "Outer", "Gust"};
+string printFormat[] = {"RR", "RC", "CR", "CC", "BB"};
 
 int Asize;
 int Bsize;

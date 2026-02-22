@@ -76,11 +76,23 @@ void updateDynamicTile(int _tj, int t0, int t1) {
 // use _iii/_jjj/_kkk represent the tile after finetune.
 void update_T() {
 
-  int oldiii = iii, oldjjj = jjj, oldkkk = kkk;
-  int oldtti = tti, oldttj = ttj, oldttk = ttk;
-  int iii2 = (iii + 1) / 2, jjj2 = (jjj + 1) / 2, kkk2 = (kkk + 1) / 2;
-  int tti2 = tti * 2, ttj2 = ttj * 2, ttk2 = ttk * 2;
-  int estsum = 0;
+  int oldiii = iii;
+  int oldjjj = jjj;
+  int oldkkk = kkk;
+
+  int oldtti = tti;
+  int oldttj = ttj;
+  int oldttk = ttk;
+
+  // int iii2 = (iii + 1) / 2;
+  int jjj2 = (jjj + 1) / 2;
+  int kkk2 = (kkk + 1) / 2;
+
+  // int tti2 = tti * 2;
+  int ttj2 = ttj * 2;
+  int ttk2 = ttk * 2;
+
+  // int estsum = 0;
 
   // jjj+kkk type 0
   // Tcnt need to clear and recalculate at each round, sizejksum and tilesum not

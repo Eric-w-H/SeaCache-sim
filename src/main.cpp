@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
     // it back to A[], and call gust dataflow
     for (int j = 0; j < J; j++) {
       for (int i = 0; i < I; i++) {
-        if (A[i].size() > j) {
+        if (static_cast<int>(A[i].size()) > j) {
           sparchA[j].push_back(A[i][j]);
           sparchAi[j].push_back(i);
         }
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
 
     for (int j = 0; j < J; j++) {
       A[j].clear();
-      for (int i = 0; i < sparchA[j].size(); i++) {
+      for (int i = 0; i < static_cast<int>(sparchA[j].size()); i++) {
         A[j].push_back(sparchA[j][i]);
       }
     }
@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
     // the actual access size
     tmplen = tmplen * 3;
 
-    int freqj = (offsetarrayAc[j + 1] - offsetarrayAc[j]);
+    // int freqj = (offsetarrayAc[j + 1] - offsetarrayAc[j]);
   }
   // two problem:
   // 1) this calculate way just calculate the minimum
@@ -374,11 +374,11 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  long long SmallestTile = ((long long)pbound) * J;
+  // long long SmallestTile = ((long long)pbound) * J;
 
-  int kbound = getkbound();
-  int jbound = getjbound();
-  int ibound = getibound();
+  // int kbound = getkbound();
+  // int jbound = getjbound();
+  // int ibound = getibound();
 
   int usesearchedtile = 1;
   if (usesearchedtile) {
@@ -387,9 +387,17 @@ int main(int argc, char *argv[]) {
     ISDYNAMICK = 0;
     ISDYNAMICI = 0;
 
-    freopen((tile_dir + matrix_name1).c_str(), "r", stdin);
     int t_i, t_j, t_k;
-    scanf("%d%d%d", &t_i, &t_j, &t_k);
+
+    if(!freopen((tile_dir + matrix_name1).c_str(), "r", stdin)) {
+      std::cerr << "Error opening " << (tile_dir + matrix_name1) << std::endl;
+      return 1;
+    }
+
+    if(std::scanf("%d%d%d", &t_i, &t_j, &t_k) != 3) {
+      std::cerr << "Error reading " << (tile_dir + matrix_name1) << ", expected three integers." << std::endl;
+      return 1;
+    }
     fclose(stdin);
 
     iii = t_i;

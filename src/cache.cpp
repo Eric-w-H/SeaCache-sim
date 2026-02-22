@@ -470,7 +470,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         int oldtag = Tag[_set][replaceindex];
         Tag[_set][replaceindex] = _tag;
         Cnt[_set][replaceindex] = fibercnt - 1;
-        int oldorig = PosOrig[_set][replaceindex];
+        // int oldorig = PosOrig[_set][replaceindex];
         if (!isfirst) {
           PosOrig[_set][replaceindex] = getOrig(firstaddr);
         } else {
@@ -928,7 +928,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     int nextpos = getNextpos(jj, ii);
     // access the head pointer
     computeSramAccess += sramWriteBandwidth(CACHEBLOCK);
-    bool anymiss = 0;
+    // bool anymiss = 0;
 
     long long tmpaddr = getCacheAddr(jj, 0);
     bool tmphit = cacheReadOPT(tmpaddr, nextpos);
@@ -961,7 +961,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     int nextpos = getNextpos(jj, ii);
     // access the head pointer
     computeSramAccess += sramWriteBandwidth(CACHEBLOCK);
-    bool anymiss = 0;
+    // bool anymiss = 0;
 
     long long tmpaddr = getCacheAddr(jj, 0);
     bool tmphit = cacheReadOPT(tmpaddr, nextpos);

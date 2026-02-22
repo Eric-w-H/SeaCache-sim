@@ -114,8 +114,8 @@ void updateBlockA() {
       if (ti > I)
         break;
 
-      int startj = beginA[ti], tmpj = beginA[ti],
-          maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
+      int startj = beginA[ti], tmpj = beginA[ti];
+      int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
 
       // jjj -> ((ISDYNAMICJ)?dynj:jjj)
 
@@ -139,8 +139,8 @@ void updateBlockA() {
       if (tj > J)
         break;
 
-      int starti = beginAc[tj], tmpi = beginAc[tj],
-          maxi = offsetarrayAc[tj + 1] = offsetarrayAc[tj];
+      int starti = beginAc[tj], tmpi = beginAc[tj];
+      int maxi = offsetarrayAc[tj + 1] = offsetarrayAc[tj];
 
       while (tmpi < maxi && Ac[tj][tmpi] < iii + TI) {
         tmpi++;
@@ -199,7 +199,9 @@ void updateBlockC() {
 void forcebeginA() {
   for (int i = 0; i < I; i++) {
 
-    int startj = 0, tmpj = 0, maxj = offsetarrayA[i + 1] - offsetarrayA[i];
+    // int startj = 0;
+    int tmpj = 0;
+    int maxj = offsetarrayA[i + 1] - offsetarrayA[i];
 
     // here is TJ because TJ have added jjj before call the func
     while (tmpj < maxj && A[i][tmpj] < TJ) {
@@ -210,7 +212,9 @@ void forcebeginA() {
   }
 
   for (int tj = 0; tj < J; tj++) {
-    int starti = 0, tmpi = 0, maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
+    // int starti = 0;
+    int tmpi = 0;
+    int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
 
     while (tmpi < maxi && Ac[tj][tmpi] < TI) {
       tmpi++;
@@ -223,7 +227,9 @@ void forcebeginB() {
 
   for (int tj = 0; tj < J; tj++) {
 
-    int startk = 0, tmpk = 0, maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
+    // int startk = 0;
+    int tmpk = 0;
+    int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
     while (tmpk < maxk && B[tj][tmpk] < TK) {
       tmpk++;
@@ -234,7 +240,9 @@ void forcebeginB() {
 
   for (int tk = 0; tk < K; tk++) {
 
-    int startj = 0, tmpj = 0, maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
+    // int startj = 0;
+    int tmpj = 0;
+    int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
     while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
       tmpj++;
@@ -250,8 +258,9 @@ void updateBeginA() {
     if (ti > I)
       break;
 
-    int startj = beginA[ti], tmpj = beginA[ti],
-        maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
+    // int startj = beginA[ti];
+    int tmpj = beginA[ti];
+    int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
 
     // here is TJ because TJ have added jjj before call the func
     while (tmpj < maxj && A[ti][tmpj] < TJ) {
@@ -267,8 +276,9 @@ void ALLupdateBeginAc() {
     if (tj > J)
       break;
 
-    int starti = beginAc[tj], tmpi = beginAc[tj],
-        maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
+    // int starti = beginAc[tj];
+    int tmpi = beginAc[tj];
+    int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
 
     while (tmpi < maxi && Ac[tj][tmpi] < TI) {
       tmpi++;
@@ -283,8 +293,9 @@ void AllupdateBeginA() {
     if (ti > I)
       break;
 
-    int startj = beginA[ti], tmpj = beginA[ti],
-        maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
+    // int startj = beginA[ti];
+    int tmpj = beginA[ti];
+    int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
     while (tmpj < maxj && A[ti][tmpj] < TJ) {
       tmpj++;
     }
@@ -300,8 +311,9 @@ void updateBeginAc() {
     if (tj > J)
       break;
 
-    int starti = beginAc[tj], tmpi = beginAc[tj],
-        maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
+    // int starti = beginAc[tj];
+    int tmpi = beginAc[tj];
+    int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
 
     while (tmpi < maxi && Ac[tj][tmpi] < TI) {
       tmpi++;
@@ -318,8 +330,9 @@ void AllupdateBeginB() {
     if (tj > J)
       break;
 
-    int startk = beginB[tj], tmpk = beginB[tj],
-        maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
+    // int startk = beginB[tj];
+    int tmpk = beginB[tj];
+    int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
     while (tmpk < maxk && B[tj][tmpk] < TK) {
       tmpk++;
@@ -336,8 +349,9 @@ void AllupdateBeginBc() {
     if (tk > K)
       break;
 
-    int startj = beginBc[tk], tmpj = beginBc[tk],
-        maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
+    // int startj = beginBc[tk]; 
+    int tmpj = beginBc[tk];
+    int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
     while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
       tmpj++;
@@ -355,8 +369,9 @@ void updateBeginB() {
     if (tj > J)
       break;
 
-    int startk = beginB[tj], tmpk = beginB[tj],
-        maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
+    // int startk = beginB[tj];
+    int tmpk = beginB[tj];
+    int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
     while (tmpk < maxk && B[tj][tmpk] < TK) {
       tmpk++;
@@ -373,8 +388,9 @@ void updateBeginBc() {
     if (tk > K)
       break;
 
-    int startj = beginBc[tk], tmpj = beginBc[tk],
-        maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
+    // int startj = beginBc[tk];
+    int tmpj = beginBc[tk];
+    int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
     while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
       tmpj++;
@@ -1086,7 +1102,8 @@ void pre_load_B() {
 
       // equals to 0(when jjj in the first half) or 1(when jjj in the second
       // half);
-      int _TJ, _TK;
+      int _TJ;
+      // int _TK;
 
       for (tj = TJ; tj < TJ + jjj; tj++) {
         if (tj > J)
@@ -1755,7 +1772,7 @@ void updateCAccess(int ii) {
     // check the delta buffer: how many new C elements (indicate how many
     // increase)
     int deltaC = 0;
-    int oldsize = bufferedClen[ii];
+    // int oldsize = bufferedClen[ii];
     for (int k1 = TK; k1 < TK + ((ISDYNAMICK) ? dynk : kkk); k1++) {
       if (tmpC[k1]) {
         // the k1 is a new element
@@ -1929,13 +1946,13 @@ int prefetchRowNow = 0;
 
 bool prefetchrow(int ii) {
 
-  int needsize;
+  int needsize = 0;
   // FLRU mode; need 2data+1coord+1next pointer (*4)
   if (cacheScheme == 6 || cacheScheme == 7) {
     needsize = currsizeA[ii] * 4 + 1;
   }
   // FLFU mode; don't need next pointer (*3)
-  if (cacheScheme == 66 || cacheScheme == 88) {
+  else if (cacheScheme == 66 || cacheScheme == 88) {
     needsize = currsizeA[ii] * 3;
   }
 
@@ -2096,12 +2113,12 @@ bool prefetchrow(int ii) {
 void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
                                   int T_J) {
   // --- Offline Phase ---
-  double avg_nonzero_length_B;
-  if (K > 0 && T_J > 0) {
-    avg_nonzero_length_B = static_cast<double>(nnzB) / K;
-  } else {
-    avg_nonzero_length_B = 1.0;
-  }
+  // double avg_nonzero_length_B;
+  // if (K > 0 && T_J > 0) {
+  //   avg_nonzero_length_B = static_cast<double>(nnzB) / K;
+  // } else {
+  //   avg_nonzero_length_B = 1.0;
+  // }
 
   current_prefetch_size = 1.0 / 128.0;
 
@@ -2169,8 +2186,7 @@ void update_prefetch_size() {
     } else {
       current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
     }
-    double current_no_counter_miss_rate =
-        ((double)data_access_misses) / data_access_total;
+    // double current_no_counter_miss_rate = static_cast<double>(data_access_misses) / data_access_total;
     // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
     //        prefetch_discards, prefetch_increments);
 
@@ -2266,8 +2282,7 @@ void update_prefetch_size() {
   } else {
     current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
   }
-  double current_no_counter_miss_rate =
-      ((double)data_access_misses) / data_access_total;
+  // double current_no_counter_miss_rate = static_cast<double>(data_access_misses) / data_access_total;
   // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
   // prefetch_discards,
   //       prefetch_increments);
@@ -2424,7 +2439,8 @@ void calculate() {
 
       for (int ii = 0; ii < iii; ii++) {
 
-        int cnew = 0, cnow = 0;
+        // int cnew = 0;
+	int cnow = 0;
 
         // update A
         // get A
