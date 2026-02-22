@@ -1,11 +1,44 @@
+###################################################
+# Constants
+###################################################
+TARGET := scache
 
-build:
-	mkdir -p build
-	g++ -O3 -march=native  src/config.cpp src/data.cpp src/estimation.cpp src/parameters.cpp src/util.cpp src/statistics.cpp src/cache.cpp src/dynamic.cpp src/simulator.cpp src/main.cpp -o build/scache
+SRC_DIRS := ./src
+BUILD_DIR := ./build
+OUTPUT_DIR := ./output
 
-install: build
-	cp build/scache ./scache
-	mkdir -p output
+# find the source files, extract the filenames, 
+# stick them in the build dir as .o
+SRC := $(shell find $(SRC_DIRS) -name '*.cpp')
+FILENAMES := $(basename $(notdir $(SRC)))
+OBJS := $(FILENAMES:%=$(BUILD_DIR)/%.o)
+
+# Flags for g++
+CPPFLAGS := -O3 -Wall -Werror
+
+# Phony targets (do not represent a file)
+.PHONY: clean
+
+###################################################
+# Targets
+###################################################
+$(TARGET): $(BUILD_DIR)/$(TARGET)
+	@mkdir -p $(OUTPUT_DIR)
+	cp $(BUILD_DIR)/$(TARGET) ./$(TARGET)
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	g++ $(CPPFLAGS) $(OBJS) -o $(BUILD_DIR)/$(TARGET)
+
+# Construct a unique compilation step for each src->object
+# to minimize re-building
+define OBJ_COMP_TEMPLATE =
+$(BUILD_DIR)/$(basename $(notdir $(1))).o: $(1)
+	@mkdir -p $(BUILD_DIR)
+	g++ -c $(CPPFLAGS) $(1) -o $$@
+endef
+
+# Instantiate & evaluate each of the object build steps
+$(foreach f,$(SRC),$(eval $(call OBJ_COMP_TEMPLATE,$(f))))
 
 clean:
-	rm -r ./build ./output scache
+	-rm -r $(BUILD_DIR) $(OUTPUT_DIR) $(TARGET)
