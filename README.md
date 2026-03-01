@@ -35,6 +35,13 @@ Here is a sample json configuration:
 - "condensedOP": When set to true, it uses the condensed OP dataflow instead of the default Gustavson's dataflow.
 - "tileDir": Represents the directory containing the tiling selection for each matrix.
 
+
+### scripts
+Check inputs exist (scache, tile files, .mtx files).
+Generate config JSON files for a sweep.
+Run ./scache matrix matrix config.json.
+Parse output .txt files into one CSV.
+
 ### Code description
 
 The code shares the same base simulator as the previous work, [HYTE](https://github.com/tsinghua-ideal/HYTE-sim ""). However, this work shifts the focus from tile selection to cache optimization, with the pre-defined tiling selection located in the "tileDir" directory. The modifications primarily involve various cache schemes and prefetching techniques.
