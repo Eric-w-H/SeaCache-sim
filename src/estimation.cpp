@@ -620,9 +620,11 @@ void getParameter() {
   }
 }
 
-double getvarianceBJ(int ttj) { return 1; }
+// double getvarianceBJ(int ttj) { return 1; }
+double getvarianceBJ(int) { return 1; }
 
-double getvarianceBK(int ttk) { return 1; }
+// double getvarianceBK(int ttk) { return 1; }
+double getvarianceBK(int) { return 1; }
 
 long long getnnzC(int jj) { return nnzCTk[getlog(jj)]; }
 

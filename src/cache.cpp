@@ -680,7 +680,7 @@ int getNextpos(int rowid, int ii) {
   return ReplaceMAX;
 }
 
-int getLFU(int rowid, int ii) {
+int getLFU(int rowid, int /* ii */) {
   int retlfu = LFUtag[rowid];
   LFUtag[rowid]--;
   return retlfu;

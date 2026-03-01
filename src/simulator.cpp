@@ -2110,8 +2110,9 @@ bool prefetchrow(int ii) {
   return 1;
 }
 
-void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
-                                  int T_J) {
+// void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
+//                                   int T_J) {
+void initialize_adaptive_prefetch(long long, long long, int, int, int) {
   // --- Offline Phase ---
   // double avg_nonzero_length_B;
   // if (K > 0 && T_J > 0) {
@@ -2824,7 +2825,7 @@ void run() {
   analyze_statistics();
 }
 
-void runTile(bool isest, int iii, int jjj, int kkk, long long tti,
+void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
              long long ttj, long long ttk, long long SmallestTile) {
 
   // only prunning in the estimation mode
@@ -2852,7 +2853,7 @@ void runTile(bool isest, int iii, int jjj, int kkk, long long tti,
       }
     }
 
-    // prunning
+    // pruning
     if (((long long)jjj * kkk) * 4 < SmallestTile) {
       return;
     }

@@ -14,7 +14,7 @@ FILENAMES := $(basename $(notdir $(SRC)))
 OBJS := $(FILENAMES:%=$(BUILD_DIR)/%.o)
 
 # Flags for g++
-CPPFLAGS := -O3 -Wall -Werror
+CPPFLAGS := -O3 -Wall -Wextra -Werror
 
 # Phony targets (do not represent a file)
 .PHONY: clean

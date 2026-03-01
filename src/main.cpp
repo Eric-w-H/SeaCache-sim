@@ -8,6 +8,18 @@
 using json = nlohmann::json;
 
 int main(int argc, char *argv[]) {
+  if(argc != 4) {
+    std::cerr << "Error, invalid command line.\n";
+    std::cout << "Usage: " << argv[0] << " matrix1 matrix2 config_file\n"
+	      << "matrix1 and matrix2 are Matrix Market format without the file extension.\n"
+	      << "Search locations for matrix1 and matrix2, in order:\n"
+	      << "  ./largedata/matrix1/matrix1.mtx\n"
+	      << "  ./data/matrix1.mtx\n"
+	      << "  ./dense/matrix1.mtx\n"
+	      << "  ./bfs/matrix1.mtx\n"
+	      << "config_file is a fully qualified path to the .json config for the run.\n" << std::endl;
+    return 1;
+  }
 
   std::string matrix_name1 = argv[1];
   std::string matrix_name2 = argv[2];
@@ -57,7 +69,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
-                (baselinetest ? "Base_" : "SeaCache_") +
+                (baselinetest ? "Base_" : "570Cache_") +
                 std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
                 "GBs_" + std::to_string(tmpPE) + "PEs_" +
                 std::to_string(tmpbank) + "sbanks_" + "_" + matrix_name1 + "_" +
@@ -442,22 +454,19 @@ int main(int argc, char *argv[]) {
       SETLOG = getlog(SET);
       // calculate metadata overhead.
       // if metadata overflow, choose smaller tile
-      int keepkkk = kkk;
-      int keepttk = ttk;
+      int newkkk = kkk;
+      int newttk = ttk;
       // if can keep, just use current kkk
       if (cachesize > kkk * 2) {
         cachesize -= kkk * 2;
       } else {
         // if can't keep, use smaller kkk
         // (make kkk*2 to be half cachesize)
-        kkk = cachesize / 4;
-        ttk = (K + kkk - 1) / kkk;
+        newkkk = cachesize / 4;
+        newttk = (K + kkk - 1) / kkk;
         cachesize -= kkk * 2;
       }
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
-      // return to the selected tile size.
-      kkk = keepkkk;
-      ttk = keepttk;
+      runTile(0, iii, jjj, newkkk, tti, newttk, ttj, 0);
       // return to the default setting
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
@@ -497,12 +506,8 @@ int main(int argc, char *argv[]) {
 
       run();
 
-      return 0;
-    }
-
-    bool testseacache = 1;
-    if (testseacache) {
-
+      // EWH
+      // Incorporate SeaCache into baseline
       puts("\n***************** SeaCache *******************");
 
       adaptive_prefetch = 1;
@@ -518,6 +523,23 @@ int main(int argc, char *argv[]) {
 
       adaptive_prefetch = 0;
       useVirtualTag = 0;
+    }
+
+    bool testdensecache = 0;
+    if (testdensecache) {
+	    puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
+	    return 0;
+            
+	    /*****************************************
+	    adaptive_prefetch = 1;
+	    useVirtualTag = 2;
+	    cacheScheme;
+	    cachesize = inputcachesize;
+
+	    runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+	    adaptive_prefetch = 0;
+	    useVirtualTag = 0;
+	    *****************************************/
     }
 
     bool ablationtest = 0;
