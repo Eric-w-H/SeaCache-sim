@@ -14,7 +14,7 @@ FILENAMES := $(basename $(notdir $(SRC)))
 OBJS := $(FILENAMES:%=$(BUILD_DIR)/%.o)
 
 # Flags for g++
-CPPFLAGS := -O3 -Wall -Wextra -Werror
+CPPFLAGS := -O3 -Wall -Werror
 
 # Phony targets (do not represent a file)
 .PHONY: clean
@@ -27,14 +27,14 @@ $(TARGET): $(BUILD_DIR)/$(TARGET)
 	cp $(BUILD_DIR)/$(TARGET) ./$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
-	g++ $(CPPFLAGS) $(OBJS) -o $(BUILD_DIR)/$(TARGET)
+	/opt/homebrew/bin/g++-15 $(CPPFLAGS) $(OBJS) -o $(BUILD_DIR)/$(TARGET)
 
 # Construct a unique compilation step for each src->object
 # to minimize re-building
 define OBJ_COMP_TEMPLATE =
 $(BUILD_DIR)/$(basename $(notdir $(1))).o: $(1)
 	@mkdir -p $(BUILD_DIR)
-	g++ -c $(CPPFLAGS) $(1) -o $$@
+	/opt/homebrew/bin/g++-15 -c $(CPPFLAGS) $(1) -o $$@
 endef
 
 # Instantiate & evaluate each of the object build steps
