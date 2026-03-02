@@ -18,17 +18,19 @@ int main(int argc, char *argv[]) {
     std::cout << "Error registering deinitialize_simulator in atexit" << std::endl;
     return 1;
   }
+  if(std::atexit(deinitialize_cache)) {
+    std::cout << "Error registering deinitialize_cache in atexit" << std::endl;
+    return 1;
+  }
 
   if(argc != 4) {
-    std::cerr << "Error, invalid command line.\n";
-    std::cout << "Usage: " << argv[0] << " matrix1 matrix2 config_file\n"
-        << "matrix1 and matrix2 are Matrix Market format without the file extension.\n"
-        << "Search locations for matrix1 and matrix2, in order:\n"
+    std::cerr << "Usage: " << argv[0] << " matrix1 matrix2 config/file/path\n"
+        << "\nSearch locations for matrix1 and matrix2, in order:\n"
         << "  ./largedata/matrix1/matrix1.mtx\n"
         << "  ./data/matrix1.mtx\n"
         << "  ./dense/matrix1.mtx\n"
         << "  ./bfs/matrix1.mtx\n"
-        << "config_file is a fully qualified path to the .json config for the run.\n" << std::endl;
+        << "config_file is a fully qualified path to the .json config for the run (likely config/config.json).\n" << std::endl;
     return 1;
   }
 
@@ -383,6 +385,7 @@ int main(int argc, char *argv[]) {
 
     SET = cachesize / (CACHEBLOCK * SETASSOC);
     SETLOG = getlog(SET);
+    initialize_cache();
   }
 
   sampleB();
@@ -453,12 +456,27 @@ int main(int argc, char *argv[]) {
     /////////////// Baseline configurations
 
     if (baselinetest) {
+      // EWH
+      // Incorporate SeaCache into baseline
+      puts("***************** SeaCache *******************");
+      printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, K, (J + jjj - 1) / jjj,
+             nzB / (K * ((J + jjj - 1) / jjj)));
+
+      adaptive_prefetch = 1;
+      useVirtualTag = 1;
+      cacheScheme = 88;
+      cachesize = inputcachesize;
+
+      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
+      adaptive_prefetch = 0;
+      useVirtualTag = 0;
 
       adaptive_prefetch = 0;
 
       ////////////  InnserSP
       // static FLRU + 16 words scheme0
-      puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
+      puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       prefetchSize = inputcachesize / 6;
       cacheScheme = 11100;
@@ -467,6 +485,7 @@ int main(int argc, char *argv[]) {
       CACHEBLOCKLOG = 4;
       SET = cachesize / (CACHEBLOCK * SETASSOC);
       SETLOG = getlog(SET);
+      initialize_cache();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
 
       fflush(stdout);
@@ -483,6 +502,7 @@ int main(int argc, char *argv[]) {
       CACHEBLOCKLOG = 8;
       SET = cachesize / (CACHEBLOCK * SETASSOC);
       SETLOG = getlog(SET);
+      initialize_cache();
       // calculate metadata overhead.
       // if metadata overflow, choose smaller tile
       int newkkk = kkk;
@@ -504,6 +524,7 @@ int main(int argc, char *argv[]) {
       cachesize = inputcachesize;
       SET = cachesize / (CACHEBLOCK * SETASSOC);
       SETLOG = getlog(SET);
+      initialize_cache();
 
       fflush(stdout);
 
@@ -519,12 +540,14 @@ int main(int argc, char *argv[]) {
       CACHEBLOCKLOG = 2;
       SET = cachesize / (CACHEBLOCK * SETASSOC);
       SETLOG = getlog(SET);
+      initialize_cache();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
       // return to the default setting
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
       SET = cachesize / (CACHEBLOCK * SETASSOC);
       SETLOG = getlog(SET);
+      initialize_cache();
 
       fflush(stdout);
 
@@ -537,28 +560,6 @@ int main(int argc, char *argv[]) {
 
       run();
 
-      // EWH
-      // Incorporate SeaCache into baseline
-      puts("\n***************** SeaCache *******************");
-
-
-      printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, K, (J + jjj - 1) / jjj,
-             nzB / (K * ((J + jjj - 1) / jjj)));
-
-      adaptive_prefetch = 1;
-      useVirtualTag = 1;
-      cacheScheme = 88;
-      cachesize = inputcachesize;
-      ISCACHE = 1;
-      CACHEBLOCK = 16;
-      CACHEBLOCKLOG = 4;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
-
-      adaptive_prefetch = 0;
-      useVirtualTag = 0;
     }
 
     if (!baselinetest) {

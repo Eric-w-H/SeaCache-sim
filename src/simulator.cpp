@@ -1996,24 +1996,24 @@ bool prefetchrow(int ii) {
         prefetch_increments++;
 
         for (int i = 0; i < SETASSOC; i++) {
-          if (Valid[_set][i] && (Tag[_set][i] == _tag)) {
+          if (Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag)) {
 
             // not the first, need to check orig
             if (tmpcurr != 0) {
-              if (PosOrig[_set][i] != getOrig(firstaddr)) {
+              if (PosOrig[_set * SETASSOC + i] != getOrig(firstaddr)) {
                 // not the same orig
                 continue;
               }
             } else {
-              if (PosOrig[_set][i] != 0) {
+              if (PosOrig[_set * SETASSOC + i] != 0) {
                 continue;
               }
             }
             // hit
             incache = 1;
-            lfubit[_set][i]++;
+            lfubit[_set * SETASSOC + i]++;
             // if the updated flfu bit overflow
-            if (lfubit[_set][i] > LFUmax) {
+            if (lfubit[_set * SETASSOC + i] > LFUmax) {
               needhalf = 1;
             }
             break;
@@ -2025,12 +2025,12 @@ bool prefetchrow(int ii) {
           if (!incache) {
             bool invirtualtag = 0;
             for (int i = 0; i < VIRTUALSETASSOC; i++) {
-              if (virtualValid[_set][i]) {
-                if (virtualTag[_set][i] == _tag) {
+              if (virtualValid[_set * SETASSOC + i]) {
+                if (virtualTag[_set * SETASSOC + i] == _tag) {
                   // in virtual
                   invirtualtag = 1;
-                  virtuallfubit[_set][i]++;
-                  if (virtuallfubit[_set][i] > LFUmax) {
+                  virtuallfubit[_set * SETASSOC + i]++;
+                  if (virtuallfubit[_set * SETASSOC + i] > LFUmax) {
                     needhalf = 1;
                   }
                   // if find a matched, don't need to check others
@@ -2044,13 +2044,13 @@ bool prefetchrow(int ii) {
 
               bool hasinvalid = 0;
               for (int i = 0; i < VIRTUALSETASSOC; i++) {
-                if (virtualValid[_set][i] == 0) {
+                if (virtualValid[_set * SETASSOC + i] == 0) {
                   // has invalide!
                   hasinvalid = 1;
                   // put the slot here
-                  virtualValid[_set][i] = 1;
-                  virtualTag[_set][i] = _tag;
-                  virtuallfubit[_set][i] = 1;
+                  virtualValid[_set * SETASSOC + i] = 1;
+                  virtualTag[_set * SETASSOC + i] = _tag;
+                  virtuallfubit[_set * SETASSOC + i] = 1;
                   break;
                 }
               }
@@ -2058,12 +2058,12 @@ bool prefetchrow(int ii) {
               if (!hasinvalid) {
 
                 for (int i = 0; i < VIRTUALSETASSOC; i++) {
-                  if (virtuallfubit[_set][i] == 0) {
+                  if (virtuallfubit[_set * SETASSOC + i] == 0) {
                     // find a slot = 0, replace it to the current fiber
                     haszero = 1;
-                    virtualValid[_set][i] = 1;
-                    virtualTag[_set][i] = _tag;
-                    virtuallfubit[_set][i] = 1;
+                    virtualValid[_set * SETASSOC + i] = 1;
+                    virtualTag[_set * SETASSOC + i] = _tag;
+                    virtuallfubit[_set * SETASSOC + i] = 1;
 
                     break;
                   }
@@ -2081,8 +2081,8 @@ bool prefetchrow(int ii) {
         // both update in cache or virtual tag will cause the half
         if (needhalf) {
           for (int i = 0; i < SETASSOC; i++) {
-            if (Valid[_set][i]) {
-              lfubit[_set][i] /= 2;
+            if (Valid[_set * SETASSOC + i]) {
+              lfubit[_set * SETASSOC + i] /= 2;
             }
           }
 
@@ -2091,8 +2091,8 @@ bool prefetchrow(int ii) {
           // but is 0 now, then will be replace, but actually better
           if (useVirtualTag) {
             for (int i = 0; i < VIRTUALSETASSOC; i++) {
-              if (virtualValid[_set][i]) {
-                virtuallfubit[_set][i] /= 2;
+              if (virtualValid[_set * SETASSOC + i]) {
+                virtuallfubit[_set * SETASSOC + i] /= 2;
               }
             }
           }
@@ -2710,11 +2710,11 @@ void reinitialize() {
     initializeCacheValid();
 
     if (useVirtualTag) {
-      memset(virtualValid, 0, sizeof(virtualValid));
+      memset(virtualValid, 0, sizeof(bool) * SET * VIRTUALSETASSOC);
     }
 
-    memset(PosOrig, 0, sizeof(PosOrig));
-    memset(vPosOrig, 0, sizeof(vPosOrig));
+    memset(PosOrig, 0, sizeof(short) * SET * SETASSOC);
+    memset(vPosOrig, 0, sizeof(short) * SET * SETASSOC);
   }
 
   // reinitialize buffer c
