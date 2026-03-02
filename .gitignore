@@ -9,3 +9,4 @@ nohup.out
 hyte
 scache
 .vscode/**
+scripts/__pycache__/**
