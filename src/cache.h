@@ -23,10 +23,10 @@ extern bool useVirtualTag;
 extern int inputcachesize;
 extern long long elements_processed_since_last_adjustment;
 
-extern queue<int> nextposvector[MAXN];
+extern queue<int> *nextposvector;
 
 extern int LFUmax;
-extern int LFUtag[MAXN];
+extern int *LFUtag;
 
 extern bool Valid[MAXSET][SETASSOC];
 extern int Tag[MAXSET][SETASSOC];

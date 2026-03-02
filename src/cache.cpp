@@ -40,7 +40,7 @@ int lrubit4[256];
 
 int LFUbit = 4;
 int LFUmax = (1 << LFUbit) - 1;
-int LFUtag[MAXN];
+int *LFUtag = nullptr;
 
 // split into 4 parts.  witin 16: 0000, 0001, 0010,,,,  1111
 short partialValid[MAXSET][SETASSOC];
@@ -661,7 +661,7 @@ void cacheEvict(long long addr) {
 
 // need a queue for each row to track all the nexposes in the prefetch window.
 // the number track in this queue is the I number of A
-queue<int> nextposvector[MAXN];
+queue<int> *nextposvector = nullptr;
 
 int getNextpos(int rowid, int ii) {
 

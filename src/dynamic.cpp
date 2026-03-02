@@ -170,9 +170,9 @@ void update_T() {
     mintype = 3;
   }
 
-  // only can increase when *2 <= I/J/K, otherwise overflow
+  // only can increase when *2 < I/J/K, otherwise overflow
   // jjj*2 + kkk type4
-  if (oldjjj * 2 <= J) {
+  if (oldjjj * 2 < J) {
     sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 +
              oldjjj * 2;
     sizejksum[4] += min(sizejk, Bsize);
@@ -191,7 +191,7 @@ void update_T() {
   }
 
   // jjj + kkk*2 type5
-  if (oldkkk * 2 <= K) {
+  if (oldkkk * 2 < K) {
     sizejk =
         (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 + oldjjj;
     sizejksum[5] += min(sizejk, Bsize);
@@ -210,7 +210,7 @@ void update_T() {
   }
 
   // jjj*2 + kkk*2 type6
-  if ((oldjjj * 2 <= J) && (oldkkk * 2 <= K)) {
+  if ((oldjjj * 2 < J) && (oldkkk * 2 < K)) {
     sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 4 +
              oldjjj * 2;
     sizejksum[6] += min(sizejk, Bsize);
@@ -229,7 +229,7 @@ void update_T() {
   }
 
   // jjj/2 + kkk*2  type7
-  if (oldkkk * 2 <= K) {
+  if (oldkkk * 2 < K) {
     sizejk = (Tcnt[0][0] + Tcnt[0][1]) * 3 * 2 + jjj2;
     sizejksum[7] += min(sizejk, Bsize);
 
@@ -251,7 +251,7 @@ void update_T() {
   }
 
   // jjj*2 + kkk/2 type8
-  if (oldjjj * 2 <= J) {
+  if (oldjjj * 2 < J) {
     sizejk = (Tcnt[0][0] + Tcnt[1][0]) * 3 * 2 + jjj;
     sizejksum[8] += min(sizejk, Bsize);
 

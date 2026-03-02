@@ -5,20 +5,20 @@
 #include "statistics.h"
 
 // store all the buffered C now
-set<int> bufferedC[MAXN];
+set<int> *bufferedC = nullptr;
 // record length of buffered C
 // equals bufferedC[i].size()
-int bufferedClen[MAXN];
+int *bufferedClen = nullptr;
 
 int BLOCKSIZE = 16;
 
-int beginA[MAXN];
-int beginB[MAXN];
+int *beginA = nullptr;
+int *beginB = nullptr;
 
-int beginAc[MAXN];
-int beginBc[MAXN];
+int *beginAc = nullptr;
+int *beginBc = nullptr;
 
-int begin[MAXN];
+// int *begin = nullptr;
 
 /*
 The current fiber size of each array
@@ -28,11 +28,11 @@ stored according to the dataflow order
 update currsize each time the block of the array changes
 (when inter-iterate)
 */
-int currsizeA[MAXN];
-int currsizeAc[MAXN];
-int currsizeB[MAXN];
-int currsizeBc[MAXN];
-int currsizeC[MAXN];
+int *currsizeA = nullptr;
+int *currsizeAc = nullptr;
+int *currsizeB = nullptr;
+int *currsizeBc = nullptr;
+// int *currsizeC = nullptr;
 
 /*
 The currently buffered size of each array
@@ -40,11 +40,11 @@ The currently buffered size of each array
 
 update bufferedsize each time
 */
-int bufferedsizeA[MAXN];
-int bufferedsizeB[MAXN];
-int bufferedsizeC[MAXN];
+int *bufferedsizeA = nullptr;
+int *bufferedsizeB = nullptr;
+// int *bufferedsizeC = nullptr;
 
-int tmpC[MAXN];
+int *tmpC = nullptr;
 
 // start of current block
 int TI, TJ, TK;
@@ -2441,7 +2441,7 @@ void calculate() {
       for (int ii = 0; ii < iii; ii++) {
 
         // int cnew = 0;
-	int cnow = 0;
+  int cnow = 0;
 
         // update A
         // get A
@@ -2630,8 +2630,65 @@ void configPartial(float partialA, float partialB, float partialC) {
   }
 }
 
-void reinitialize() {
+void initialize_simulator() {
+  // alloacte memory
+  try {
+    if(bufferedC == nullptr) bufferedC = new set<int>[I]();
+    if(bufferedClen == nullptr) bufferedClen = new int[I]();
+    if(beginA == nullptr) beginA = new int[I]();
+    if(beginB == nullptr) beginB = new int[J]();
 
+    if(beginAc == nullptr) beginAc = new int[J]();
+    if(beginBc == nullptr) beginBc = new int[K]();
+
+    // if(begin == nullptr) new int[];
+
+    if(currsizeA == nullptr) currsizeA = new int[I]();
+    if(currsizeAc == nullptr) currsizeAc = new int[J]();
+    if(currsizeB == nullptr) currsizeB = new int[J]();
+    if(currsizeBc == nullptr) currsizeBc = new int[J]();
+    // if(currsizeC == nullptr) new int[K];
+
+    if(bufferedsizeA == nullptr) bufferedsizeA = new int[I]();
+    if(bufferedsizeB == nullptr) bufferedsizeB = new int[J]();
+    // if(bufferedsizeC == nullptr) new int[K];
+
+    if(tmpC == nullptr) tmpC = new int[K]();
+
+    if(LFUtag == nullptr) LFUtag = new int[J]();
+    if(nextposvector == nullptr) nextposvector = new queue<int>[J]();
+  } catch (const std::bad_alloc &e) {
+    std::cerr << "Error allocating memory for " << e.what() << std::endl;
+    std::exit(1);
+  }
+  
+}
+
+void deinitialize_simulator() {
+  if(bufferedC != nullptr) delete[] bufferedC;
+  if(bufferedClen != nullptr) delete[] bufferedClen;
+  if(beginA != nullptr) delete[] beginA;
+  if(beginB != nullptr) delete[] beginB;
+
+  if(beginAc != nullptr) delete[] beginAc;
+  if(beginBc != nullptr) delete[] beginBc;
+
+  // if(begin != nullptr) delete[] int[];
+
+  if(currsizeA != nullptr) delete[] currsizeA;
+  if(currsizeAc != nullptr) delete[] currsizeAc;
+  if(currsizeB != nullptr) delete[] currsizeB;
+  if(currsizeBc != nullptr) delete[] currsizeBc;
+  // if(currsizeC != nullptr) delete[] currsizeC;
+
+  if(bufferedsizeA != nullptr) delete[] bufferedsizeA;
+  if(bufferedsizeB != nullptr) delete[] bufferedsizeB;
+  // if(bufferedsizeC != nullptr) delete[] bufferedsizeC;
+
+  if(tmpC != nullptr) delete[] tmpC;
+}
+
+void reinitialize() {
   // reinitialize statistics
   totalCycle = 0;
   preCycle = calCycle = postCycle = 0;

@@ -1,6 +1,8 @@
 #include "headers.h"
 #include "util.h"
 
+#include <memory>
+
 int SIcnt, SKcnt, SAnnz, SBnnz;
 
 const int pmod = 1000000007; // A large prime number
@@ -15,7 +17,7 @@ void initsample() {
 
 void sampleA() {
   // work on the sample
-  for (int i = 0; i <= I; i++) {
+  for (int i = 0; i < I; i++) {
     // Be the sampled row in probability p
     if (sampleP()) {
       for (std::size_t j = 0; j < A[i].size(); j++) {
@@ -32,7 +34,7 @@ void sampleA() {
 
 void sampleB() {
   // work on the sample
-  for (int k = 0; k <= K; k++) {
+  for (int k = 0; k < K; k++) {
     // Be the sampled row in probability p
     if (sampleP()) {
       for (std::size_t j = 0; j < Bc[k].size(); j++) {
@@ -269,7 +271,7 @@ void getParameterSample() {
 
   auto time0 = std::chrono::high_resolution_clock::now();
 
-  for (int j = 0; j <= J; j++) {
+  for (int j = 0; j < J; j++) {
 
     int tmpsizea = SAc[j].size();
     int tmpsizeb = SB[j].size();
@@ -526,13 +528,21 @@ void getParameterSample() {
   printf("nnzC = %lld, nnzCTk[7] = %lld\n", nnzCTk[0], nnzCTk[7]);
 }
 
-map<int, bool> estC[MAXN];
 
-int startA[MAXN];
-int endA[MAXN];
-int endB[MAXN];
 
 void getParameter() {
+   // These only live in this function
+   std::unique_ptr<map<int, bool>[]> estC;
+   std::unique_ptr<int[]> startA, endA, endB;
+   try {
+     estC = std::make_unique<map<int, bool>[]>(std::max(I, J));
+     startA = std::make_unique<int[]>(std::max(I, J));
+     endA = std::make_unique<int[]>(I);
+     endB = std::make_unique<int[]>(J);
+   } catch (const std::bad_alloc& e) {
+     std::cerr << "Allocation failed: " << e.what() << std::endl;
+     exit(1);
+   }
 
   // get parameters in force
 

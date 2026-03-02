@@ -17,7 +17,7 @@ OBJS := $(FILENAMES:%=$(BUILD_DIR)/%.o)
 CPPFLAGS := -O3 -Wall -Wextra -Werror
 
 # Phony targets (do not represent a file)
-.PHONY: clean
+.PHONY: clean remake
 
 ###################################################
 # Targets
@@ -39,6 +39,8 @@ endef
 
 # Instantiate & evaluate each of the object build steps
 $(foreach f,$(SRC),$(eval $(call OBJ_COMP_TEMPLATE,$(f))))
+
+remake: clean $(TARGET)
 
 clean:
 	-rm -r $(BUILD_DIR) $(OUTPUT_DIR) $(TARGET)
