@@ -54,6 +54,8 @@ int main(int argc, char *argv[]) {
   float tmpsram = config["cachesize"].get<float>();
   cachesize = tmpsram * 262144 * 0.9;
   inputcachesize = cachesize;
+  setSET();
+
   float tmpbandw = config["memorybandwidth"].get<float>();
   HBMbandwidth = (tmpbandw / 4.0) * 0.6;
   int tmpPE = config["PEcnt"].get<int>();
@@ -381,12 +383,6 @@ int main(int argc, char *argv[]) {
     offsetarrayBc[k] = offsetarrayBc[k - 1] + Bc[k - 1].size();
   }
 
-  if (ISCACHE == 1) {
-
-    SET = cachesize / (CACHEBLOCK * SETASSOC);
-    SETLOG = getlog(SET);
-    initialize_cache();
-  }
 
   sampleB();
 
@@ -483,9 +479,7 @@ int main(int argc, char *argv[]) {
       cachesize = inputcachesize;
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-      initialize_cache();
+      setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
 
       fflush(stdout);
@@ -500,9 +494,7 @@ int main(int argc, char *argv[]) {
       cachesize = inputcachesize - prefetchSize;
       CACHEBLOCK = 144;
       CACHEBLOCKLOG = 8;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-      initialize_cache();
+      setSET();
       // calculate metadata overhead.
       // if metadata overflow, choose smaller tile
       int newkkk = kkk;
@@ -522,9 +514,7 @@ int main(int argc, char *argv[]) {
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
       cachesize = inputcachesize;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-      initialize_cache();
+      setSET();
 
       fflush(stdout);
 
@@ -538,16 +528,13 @@ int main(int argc, char *argv[]) {
       cachesize = inputcachesize;
       CACHEBLOCK = 4;
       CACHEBLOCKLOG = 2;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-      initialize_cache();
+      setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+
       // return to the default setting
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
-      initialize_cache();
+      setSET();
 
       fflush(stdout);
 
@@ -590,8 +577,7 @@ int main(int argc, char *argv[]) {
       ISCACHE = 1;
       cacheScheme = 0;
       cachesize = inputcachesize;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
+      setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
 
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
@@ -601,8 +587,7 @@ int main(int argc, char *argv[]) {
       ISCACHE = 1;
       cacheScheme = 1;
       cachesize = inputcachesize;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
+      setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
 
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "

@@ -19,9 +19,11 @@ int inputcachesize;
 int SET = cachesize / (CACHEBLOCK * SETASSOC);
 int SETLOG = getlog(SET);
 
+// Params: cachesize, cacheblock
 void setSET() {
   SET = (cachesize) / (CACHEBLOCK * SETASSOC);
   SETLOG = getlog(SET);
+  initialize_cache();
 }
 
 bool *Valid = nullptr;
