@@ -382,15 +382,15 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
   // cache miss. if use virtual tag, check whether in virtual tag.
   if (useVirtualTag) {
     for (int i = 0; i < VIRTUALSETASSOC; i++) {
-      if (virtualValid[_set * SETASSOC + i]) {
-        if (virtualTag[_set * SETASSOC + i] == _tag) {
+      if (virtualValid[_set * VIRTUALSETASSOC + i]) {
+        if (virtualTag[_set * VIRTUALSETASSOC + i] == _tag) {
           // in virtual tag, then first update the virtual tag flfu (-1)
           // then check whether in cache has invalid or flfu less than this
           // if has, then put this into cache. if the replaced one is not
           // invalid, then put it into virtual tag.
           invirtualtag = 1;
           virtualindex = i;
-          virtuallfubit[_set * SETASSOC + i]--;
+          virtuallfubit[_set * VIRTUALSETASSOC + i]--;
         }
       }
     }
@@ -457,16 +457,16 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         } else {
           PosOrig[_set * SETASSOC + replaceindex] = 0;
         }
-        initPracticalLFU(_set, replaceindex, virtuallfubit[_set * SETASSOC + virtualindex]);
+        initPracticalLFU(_set, replaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
 
         // put current virtual tag to invalid
-        virtualValid[_set * SETASSOC + virtualindex] = 0;
+        virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 0;
         vPosOrig[_set * SETASSOC + virtualindex] = 0;
         return;
       }
 
       // a slot in cache has lfu less then this in virtual. replace.
-      if (replacelfu < virtuallfubit[_set * SETASSOC + virtualindex]) {
+      if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
         // update metadata in cache (config to the current access)
         Valid[_set * SETASSOC + replaceindex] = 1;
         int oldtag = Tag[_set * SETASSOC + replaceindex];
@@ -478,12 +478,12 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         } else {
           PosOrig[_set * SETASSOC + replaceindex] = 0;
         }
-        initPracticalLFU(_set, replaceindex, virtuallfubit[_set * SETASSOC + virtualindex]);
+        initPracticalLFU(_set, replaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
 
         // update metadata in virtual tag (config to the old slot in cache)
-        virtualValid[_set * SETASSOC + virtualindex] = 1;
-        virtualTag[_set * SETASSOC + virtualindex] = oldtag;
-        virtuallfubit[_set * SETASSOC + virtualindex] = replacelfu;
+        virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
+        virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
+        virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
       }
     } else { // not in cache; not in virtual tag
 
@@ -520,26 +520,26 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
       // first put into invalid slot, if there is no invalid slot, then put into
       // lfu=0 slot, if there is no lfu=0 slot, then do nothing
       for (int i = 0; i < VIRTUALSETASSOC; i++) {
-        if (!virtualValid[_set * SETASSOC + i]) {
+        if (!virtualValid[_set * VIRTUALSETASSOC + i]) {
           // has an invalid slot, put here and return (don't need to check other
           // slots)
-          virtualValid[_set * SETASSOC + i] = 1;
-          virtualTag[_set * SETASSOC + i] = _tag;
-          virtuallfubit[_set * SETASSOC + i] = 0;
+          virtualValid[_set * VIRTUALSETASSOC + i] = 1;
+          virtualTag[_set * VIRTUALSETASSOC + i] = _tag;
+          virtuallfubit[_set * VIRTUALSETASSOC + i] = 0;
           return;
         } else {
         }
       }
       for (int i = 0; i < VIRTUALSETASSOC; i++) {
-        if (!virtualValid[_set * SETASSOC + i]) {
+        if (!virtualValid[_set * VIRTUALSETASSOC + i]) {
         } else {
           // valid
-          if (virtuallfubit[_set * SETASSOC + i] == 0) {
+          if (virtuallfubit[_set * VIRTUALSETASSOC + i] == 0) {
             // if the flfu bit is 0, replace it. (according to lru, the current
             // is better)
-            virtualValid[_set * SETASSOC + i] = 1;
-            virtualTag[_set * SETASSOC + i] = _tag;
-            virtuallfubit[_set * SETASSOC + i] = 0;
+            virtualValid[_set * VIRTUALSETASSOC + i] = 1;
+            virtualTag[_set * VIRTUALSETASSOC + i] = _tag;
+            virtuallfubit[_set * VIRTUALSETASSOC + i] = 0;
 
             return;
           }
@@ -1039,7 +1039,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 // (re-)allocate memory dynamically
 int last_cache_set = 0;
 void initialize_cache() {
-  if(SET != last_cache_set) deinitialize_cache();
+  if(SET != last_cache_set) {
+    deinitialize_cache();
+    last_cache_set = SET;
+  }
   try {
     Valid = new bool[SET * SETASSOC]();
     Tag = new int[SET * SETASSOC]();
@@ -1076,5 +1079,21 @@ void deinitialize_cache() {
 
     if(Cnt != nullptr) delete[] Cnt;
     if(Next != nullptr) delete[] Next;
+
+    // (re)set all the pointers to nullptr
+    Valid = nullptr;
+    Tag = nullptr;
+    lrubit = nullptr;
+    lfubit = nullptr;
+
+    virtualValid = nullptr;
+    virtualTag = nullptr;
+    virtuallfubit = nullptr;
+
+    PosOrig = nullptr;
+    vPosOrig = nullptr;
+
+    Cnt = nullptr;
+    Next = nullptr;
 }
 

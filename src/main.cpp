@@ -54,8 +54,6 @@ int main(int argc, char *argv[]) {
   float tmpsram = config["cachesize"].get<float>();
   cachesize = tmpsram * 262144 * 0.9;
   inputcachesize = cachesize;
-  setSET();
-
   float tmpbandw = config["memorybandwidth"].get<float>();
   HBMbandwidth = (tmpbandw / 4.0) * 0.6;
   int tmpPE = config["PEcnt"].get<int>();
@@ -385,6 +383,10 @@ int main(int argc, char *argv[]) {
 
 
   sampleB();
+
+  if(ISCACHE==1) {
+    setSET();
+  }
 
   /******************Config************************************/
 
