@@ -34,20 +34,21 @@ all: $(BUILD_DIR)/$(TARGET) | $(BUILD_DIR) $(OUTPUT_DIR)
 # Redundant target for ease of use
 $(TARGET): all
 
-# Directory targets
+# Directory targets, silent
 $(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 $(DEBUG_DIR):
-	mkdir -p $(DEBUG_DIR)
+	@mkdir -p $(DEBUG_DIR)
 $(OUTPUT_DIR):
-	mkdir -p $(OUTPUT_DIR)
+	@mkdir -p $(OUTPUT_DIR)
 
 # Main and debug targets
 $(BUILD_DIR)/$(TARGET): $(OBJS) | $(BUILD_DIR)
 	g++ $(CPPFLAGS) $(OBJS) -o $(BUILD_DIR)/$(TARGET)
 
 # Construct a unique compilation step for each src->object
-# to minimize re-building
+# to minimize re-building. Depends on the src file
+# and order-only on the directory.
 define OBJ_COMP_TEMPLATE =
 $(1)/$(basename $(notdir $(2))).o: $(2) | $(1)
 	g++ -c $(3) $(2) -o $$@
@@ -70,7 +71,7 @@ $(foreach f,$(SRC),$(eval $(call OBJ_COMP_TEMPLATE,$(DEBUG_DIR),$(f),$(DEBUG_CPP
 #-------------------------------------------------- 
 # Helpful phonies
 #-------------------------------------------------- 
-remake: clean $(TARGET)
+remake: clean all
 
 clean:
 	-rm -r $(DEBUG_DIR) $(BUILD_DIR) $(OUTPUT_DIR) $(TARGET) 
