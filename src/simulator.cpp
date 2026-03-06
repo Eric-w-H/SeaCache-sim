@@ -1680,7 +1680,7 @@ void get_A_fiber_col(int jj) {
       computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
                            sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
 
-      if (cacheScheme == 11100) {
+      if (cacheScheme == CACHE_SCHEME_INNER_SP) {
         // double A access in static FLRU scheme
         computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
         computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
@@ -1716,7 +1716,7 @@ void get_A_fiber(int ii) {
       // hit
       computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
 
-      if (cacheScheme == 11100) {
+      if (cacheScheme == CACHE_SCHEME_INNER_SP) {
         // double A access in static FLRU scheme
         computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
       }
@@ -1728,7 +1728,7 @@ void get_A_fiber(int ii) {
       computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
                            sramWriteBandwidth(currsizeA[ii] * 3 + 2);
 
-      if (cacheScheme == 11100) {
+      if (cacheScheme == CACHE_SCHEME_INNER_SP) {
         // double A access in static FLRU scheme
         computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
         computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
@@ -1880,7 +1880,7 @@ void get_B_fibers(int ii) {
         if (fulltagA == 0 || ii < fullA) {
           // hit
           computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
-          if (cacheScheme == 11100) {
+          if (cacheScheme == CACHE_SCHEME_INNER_SP) {
             computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
           }
         } else {
@@ -1891,7 +1891,7 @@ void get_B_fibers(int ii) {
           computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
                                sramWriteBandwidth((tmpj - beginA[ii]) * 3);
 
-          if (cacheScheme == 11100) {
+          if (cacheScheme == CACHE_SCHEME_INNER_SP) {
             computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
             computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
             computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
@@ -1906,7 +1906,7 @@ void get_B_fibers(int ii) {
         computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
                              sramWriteBandwidth((tmpj - beginA[ii]) * 3);
 
-        if (cacheScheme == 11100) {
+        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
           computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
           computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
 
@@ -1952,7 +1952,7 @@ bool prefetchrow(int ii) {
     needsize = currsizeA[ii] * 4 + 1;
   }
   // FLFU mode; don't need next pointer (*3)
-  else if (cacheScheme == 66 || cacheScheme == 88) {
+  else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
     needsize = currsizeA[ii] * 3;
   }
 
@@ -1971,8 +1971,8 @@ bool prefetchrow(int ii) {
     // in this prefetch: push the next access queue of jj a ii
     int jj = A[ii][tmpj];
 
-    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
-        cacheScheme == 11101) {
+    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
+        cacheScheme == CACHE_SCHEME_SPARCH) {
       nextposvector[jj].push(-ii);
     }
     if (cacheScheme == 66) {
@@ -1980,7 +1980,7 @@ bool prefetchrow(int ii) {
     }
 
     // practical flfu. update in the flubit
-    if (cacheScheme == 88) {
+    if (cacheScheme == CACHE_SCHEME_FLFU) {
 
       long long firstaddr = getCacheAddr(jj, 0);
       int fibersize = currsizeB[jj] * 3;
@@ -2351,10 +2351,10 @@ void calculate() {
 
       // all prefetch scheme
       if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-          cacheScheme == 88 || cacheScheme == 11100 || cacheScheme == 11101) {
+          cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
         // reinitialize the next pointer for FLRU
-        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
-            cacheScheme == 11101) {
+        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
+            cacheScheme == CACHE_SCHEME_SPARCH) {
           for (int j1 = TJ; j1 < TJ + jjj; j1++) {
             if (j1 > J)
               break;
@@ -2394,15 +2394,15 @@ void calculate() {
         // update the prefetch window after each row
         // don't need to update prefetch window in static flru
         if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-            cacheScheme == 88 || cacheScheme == 11100 || cacheScheme == 11101) {
+            cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
 
           // first minus this row's overhead
           int needsize = 0;
-          if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11101) {
+          if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_SPARCH) {
             needsize = currsizeA[TI + ii] * 4 + 1;
           }
           // FLFU mode; don't need next pointer (*3)
-          if (cacheScheme == 66 || cacheScheme == 88) {
+          if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
             needsize = currsizeA[TI + ii] * 3;
           }
 
@@ -2896,8 +2896,8 @@ void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
     prefetchNow = 0;
     prefetchRowNow = 0;
 
-    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 11100 ||
-        cacheScheme == 11101) {
+    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
+        cacheScheme == CACHE_SCHEME_SPARCH) {
       for (int j = 0; j < J; j++) {
         while (!nextposvector[j].empty()) {
           nextposvector[j].pop();
@@ -2947,7 +2947,7 @@ void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
     setSET();
   }
 
-  if (ISCACHE && (cacheScheme == 88)) {
+  if (ISCACHE && (cacheScheme == CACHE_SCHEME_FLFU)) {
 
     cachesize = inputcachesize - prefetchSize;
 

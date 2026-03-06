@@ -1,11 +1,13 @@
 #include "parameters.h"
 
 // smaple parameter p
-double samplep = 0.01;
+double samplep = 0.01; // sampling probability
 // sample parameter k
 double samplek = 100;
 
-int I, J, K;
+int I; // num rows in A
+int J; // num rows in A, equiv. num cols in B
+int K; // num cols in B
 
 int tti = 1, ttk = 1, ttj = 1;
 // block size

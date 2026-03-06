@@ -3,7 +3,10 @@
 
 #include <memory>
 
-int SIcnt, SKcnt, SAnnz, SBnnz;
+int SIcnt; // num sampled rows in A
+int SKcnt; // num sampled cols in B
+int SAnnz;
+int SBnnz;
 
 const int pmod = 1000000007; // A large prime number
 
@@ -35,7 +38,7 @@ void sampleA() {
 void sampleB() {
   // work on the sample
   for (int k = 0; k < K; k++) {
-    // Be the sampled row in probability p
+    // Be the sampled col in probability p
     if (sampleP()) {
       for (std::size_t j = 0; j < Bc[k].size(); j++) {
         SBc[SKcnt].push_back(Bc[k][j]);
