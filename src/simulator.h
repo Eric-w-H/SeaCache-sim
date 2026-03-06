@@ -8,7 +8,6 @@ extern bool adaptive_prefetch;
 extern int minBlock;
 
 extern bool ISDYNAMICJ, ISDYNAMICK, ISDYNAMICI;
-extern int PartialConfig;
 
 extern int cacheScheme;
 

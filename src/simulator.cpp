@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "cache.h"
 #include "dynamic.h"
 #include "estimation.h"
@@ -46,7 +48,7 @@ int *bufferedsizeB = nullptr;
 
 int *tmpC = nullptr;
 
-// start of current block
+// start of current block (NOTE(ejs): block == tile?)
 int TI, TJ, TK;
 
 bool ISDYNAMICJ = 0;
@@ -59,8 +61,6 @@ int dynk;
 
 bool ISDYNAMICI = 0;
 int dyni;
-
-int PartialConfig;
 
 bool check_outer_loop() {
   if ((interorder == KIJ) || (interorder == KJI)) {
@@ -2883,7 +2883,9 @@ void run() {
 }
 
 void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
-             long long ttj, long long ttk, long long SmallestTile) {
+             long long ttj, long long ttk, long long SmallestTile)
+{
+    assert(ISCACHE);
 
   // only prunning in the estimation mode
   if (isest) {
@@ -2916,107 +2918,64 @@ void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
     }
   }
 
-  // deal with the opt metadata
-  if (ISCACHE && (cacheScheme == 6 || cacheScheme == 7)) {
+    // deal with the opt metadata
+    if (cacheScheme == 6 || cacheScheme == 7) {
 
-    cachesize = inputcachesize - prefetchSize;
-    cachesize -= kkk * 2;
+        cachesize = inputcachesize - prefetchSize;
+        cachesize -= kkk * 2;
 
-    if (cachesize < 0) {
-      puts("!!!!!! metadata out of range!!!!!!!!!!");
-      fflush(stdout);
-      return;
+        if (cachesize < 0) {
+        puts("!!!!!! metadata out of range!!!!!!!!!!");
+        fflush(stdout);
+        return;
+        }
+
+        setSET();
     }
 
-    setSET();
-  }
+    if (cacheScheme == 66) {
 
-  if (ISCACHE && (cacheScheme == 66)) {
+        cachesize = inputcachesize - prefetchSize;
 
-    cachesize = inputcachesize - prefetchSize;
+        // LFU tag size
+        cachesize -= kkk;
 
-    // LFU tag size
-    cachesize -= kkk;
+        if (cachesize < 0) {
+        puts("!!!!!! metadata out of range!!!!!!!!!!");
+        fflush(stdout);
+        return;
+        }
 
-    if (cachesize < 0) {
-      puts("!!!!!! metadata out of range!!!!!!!!!!");
-      fflush(stdout);
-      return;
+        setSET();
     }
 
-    setSET();
-  }
+    if (cacheScheme == CACHE_SCHEME_FLFU) {
 
-  if (ISCACHE && (cacheScheme == CACHE_SCHEME_FLFU)) {
+        cachesize = inputcachesize - prefetchSize;
 
-    cachesize = inputcachesize - prefetchSize;
+        setSET();
+    }
 
-    setSET();
-  }
 
-  if (!ISCACHE) {
-    if (PartialConfig == 1) {
-      // 100% B
-      configPartial(0, 1, 0);
-      interorder = InterOrder(2); // JKI
-    }
-    if (PartialConfig == 2) {
-      // 50%B + 50%A
-      configPartial(0.5, 0.5, 0);
-      interorder = InterOrder(0); // IJK
-    }
-    if (PartialConfig == 3) {
-      // 50%B + 50%C
-      configPartial(0, 0.5, 0.5);
-      interorder = InterOrder(1); // IKJ
-    }
-    // ********* Two Dyanmic Config ***********
-    if (PartialConfig == 4) {
-      // dynamic : 100%B
-      ISDYNAMICJ = 1;
-      configPartial(0, 1, 0);
-      interorder = InterOrder(1); // IKJ
-    }
-    if (PartialConfig == 5) {
-      // dynamic: 50%B 50%C
-      ISDYNAMICJ = 1;
-      configPartial(0, 0.5, 0.5);
-      interorder = InterOrder(1); // IKJ
-    }
-    if (PartialConfig == 6) {
-      configPartial(0, 1, 0);
-      interorder = InterOrder(1); // IKJ
-    }
-  }
-
-  if (ISCACHE == 1) {
     // need to allocate extra tag space in address mode
     // the address space is depends on the tiling size (equal to jjj)
     // need to update: cachesize (actually Bsize?) + SET + SETLOG
     if ((cacheScheme == 4) || (cacheScheme == 5) || (cacheScheme == 7)) {
-      // need to add back after this calculation
-      cachesize = inputcachesize;
-      SET = cachesize / (CACHEBLOCK * SETASSOC);
-      SETLOG = getlog(SET);
+        // need to add back after this calculation
+        cachesize = inputcachesize;
+        SET = cachesize / (CACHEBLOCK * SETASSOC);
+        SETLOG = getlog(SET);
     }
 
     hitcnt = 0;
     misscnt = 0;
-  }
 
-  if (!isest) {
-    //  cout <<  printInterOrder[interorder];
-    //  printf("   %d %d %d %d    !!  %d %d %d\n", iii, jjj, kkk, PartialConfig,
-    //  cachesize, SET, SETLOG);
-  }
-  fflush(stdout);
+    fflush(stdout);
 
-  // run();
-  if (isest) {
-    gustest(0);
-  } else {
-    run();
-  }
+    if (isest) {
+        gustest(0);
+    } else {
+        run();
+    }
 
-  // }
 }
