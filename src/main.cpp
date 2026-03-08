@@ -142,6 +142,13 @@ int main(int argc, char *argv[]) {
     int xx, yy;
     double zz, lala;
 
+    /* NOTE(ejs): Each mtx row is a matrix entry.
+    xx, yy [zz, lala]
+        - xx  = row index
+        - yy  = col index
+        - zz  = real component of value? (ignored)
+        - lala= imag. component of value? (ignored)
+    */
     if (tokens.size() == 2) { // pattern (nonzero values ommitted)
 
       std::istringstream(tokens[0]) >> xx;
@@ -167,6 +174,7 @@ int main(int argc, char *argv[]) {
       return 0;
     }
 
+    // WARNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
     if (transpose) {
       Ac[xx - 1].push_back(yy - 1);
       A[yy - 1].push_back(xx - 1);
@@ -280,6 +288,9 @@ int main(int argc, char *argv[]) {
   printf("Matrix B: %d x %d, number of non-zeros = %d\n", N, M, nzB);
   fflush(stdout);
 
+  // FIXME(ejs): This is extremely confusing. It should not automatically try to invert the matrix
+  // if (and only if !!?) it is non-square. The user should be responsible for storing a separate transpose
+  // version of the matrix (or add some intermediate helper that does the transposition).
   if (N != M)
     transpose ^= 1; // when transposeA = 0 -> transposeB = 1; when tranposeA=
                     // 1-> transposeB = 0
@@ -364,7 +375,7 @@ int main(int argc, char *argv[]) {
     offsetarrayB[j] = offsetarrayB[j - 1] + tmplen;
 
     // the actual access size
-    tmplen = tmplen * 3;
+    tmplen = tmplen * 3; // NOTE(ejs): wtf is this 3 supposed to mean?
 
     // int freqj = (offsetarrayAc[j + 1] - offsetarrayAc[j]);
   }
@@ -423,7 +434,7 @@ int main(int argc, char *argv[]) {
   // int ibound = getibound();
 
   int usesearchedtile = 1;
-  if (usesearchedtile) {
+  if (usesearchedtile) { // NOTE(ejs): this branch is **useless** (it is always taken)
 
     ISDYNAMICJ = 0;
     ISDYNAMICK = 0;
@@ -462,7 +473,7 @@ int main(int argc, char *argv[]) {
 
       adaptive_prefetch = 1;
       useVirtualTag = 1;
-      cacheScheme = 88;
+      cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
 
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
@@ -477,7 +488,7 @@ int main(int argc, char *argv[]) {
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       prefetchSize = inputcachesize / 6;
-      cacheScheme = 11100;
+      cacheScheme = CACHE_SCHEME_INNER_SP;
       cachesize = inputcachesize;
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
@@ -491,7 +502,7 @@ int main(int argc, char *argv[]) {
       puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test Sparch   "
            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       ISCACHE = 1;
-      cacheScheme = 11101;
+      cacheScheme = CACHE_SCHEME_SPARCH;
       prefetchSize = inputcachesize / 6;
       cachesize = inputcachesize - prefetchSize;
       CACHEBLOCK = 144;
@@ -526,7 +537,7 @@ int main(int argc, char *argv[]) {
       // LRU + 4 words scheme0
       // just same as using scheme0 with cacheline = 4
       ISCACHE = 1;
-      cacheScheme = 0;
+      cacheScheme = CACHE_SCHEME_BASE;
       cachesize = inputcachesize;
       CACHEBLOCK = 4;
       CACHEBLOCKLOG = 2;
@@ -577,7 +588,7 @@ int main(int argc, char *argv[]) {
            "!!!!!!!!!!!!!!!!!!!!!!!!");
       puts("CacheScheme 0");
       ISCACHE = 1;
-      cacheScheme = 0;
+      cacheScheme = CACHE_SCHEME_BASE;
       cachesize = inputcachesize;
       setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
@@ -587,7 +598,7 @@ int main(int argc, char *argv[]) {
 
       puts("CacheScheme 1");
       ISCACHE = 1;
-      cacheScheme = 1;
+      cacheScheme = CACHE_SCHEME_MAPPING;
       cachesize = inputcachesize;
       setSET();
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
@@ -596,7 +607,7 @@ int main(int argc, char *argv[]) {
            "!!!!!!!!!!!!!!!!!!!!!!!!");
 
       useVirtualTag = 0;
-      cacheScheme = 88;
+      cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 6;
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
@@ -606,7 +617,7 @@ int main(int argc, char *argv[]) {
 
       puts("CacheScheme 88 practical FLFU  with virtual tag 1/6");
       useVirtualTag = 1;
-      cacheScheme = 88;
+      cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 6;
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
@@ -614,7 +625,7 @@ int main(int argc, char *argv[]) {
 
       puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
       useVirtualTag = 1;
-      cacheScheme = 88;
+      cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 16;
       runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);

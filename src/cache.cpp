@@ -790,7 +790,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
   // fiber + cut + whole
   // only cache the part within a cacheline (x-cache)
-  if (cacheScheme == 0) {
+  if (cacheScheme == CACHE_SCHEME_BASE) {
     // if the whole size exceed the cacheline, then the rest part miss
     long long tmpaddr = getCacheAddr(jj, 0);
 
@@ -821,7 +821,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
   // fiber + split + whole
   // split to multiple consective cachelines when exceed cacheline size
-  if (cacheScheme == 1) {
+  if (cacheScheme == CACHE_SCHEME_MAPPING) {
     // for each BLOCK segment of the B fiber
 
     // will be set to 1 if any cacheblock is miss
@@ -934,7 +934,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
   // InnerSP
   // scheme0 + static OPT
-  if (cacheScheme == 11100) {
+  if (cacheScheme == CACHE_SCHEME_INNER_SP) {
     int nextpos = getNextpos(jj, ii);
     // access the head pointer
     computeSramAccess += sramWriteBandwidth(CACHEBLOCK);
@@ -967,7 +967,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
   // Sparch
   // scheme0 + dynamic OPT
-  if (cacheScheme == 11101) {
+  if (cacheScheme == CACHE_SCHEME_SPARCH) {
     int nextpos = getNextpos(jj, ii);
     // access the head pointer
     computeSramAccess += sramWriteBandwidth(CACHEBLOCK);
@@ -1024,7 +1024,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
   // 88 refers to the practical FLFU (enabling 4-bit, virtual tag)  (virtual
   // tag can be configured or not (baseline)) the flu information is no longer
   // kept in the LFUtag, but the extra lfubit
-  if (cacheScheme == 88) {
+  if (cacheScheme == CACHE_SCHEME_FLFU) {
     bool anymiss = 0;
     fibersize = currsizeB[jj] * 3;
     for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHEBLOCK) {

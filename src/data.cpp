@@ -6,20 +6,32 @@
 
 #include "headers.h"
 
-int N, M, nzA, nzB;
+int M;  // num rows in A
+int N;  // num cols in A (and num rows in B)
+int nzA;
+int nzB;
 
-std::vector<int> *A = nullptr, *Ac = nullptr, *B = nullptr, *Bc = nullptr;
+// Let (r,c) be a valid non-zero entry in A. Then:
+std::vector<int>
+    *A  = nullptr,  // A[r]  = c
+    *Ac = nullptr,  // Ac[c] = r
+    *B  = nullptr,
+    *Bc = nullptr;
 
 std::vector<int> *sparchA = nullptr, *sparchAi = nullptr;
 
 int *offsetarrayA = nullptr, *offsetarrayAc = nullptr;
 int *offsetarrayB = nullptr, *offsetarrayBc = nullptr;
 
-int SI, SK;
-std::vector<int> *SA = nullptr;
-std::vector<int> *SAc = nullptr;
-std::vector<int> *SBc = nullptr;
-std::vector<int> *SB = nullptr;
+// Let row r be sampled from A, and it is the (r')th sampled row.
+// Then for all indices [(r,c_1), (r,c_2), ..., (r,c_u)] in the row:
+std::vector<int> *SA = nullptr;     //  SA[r']  = c
+std::vector<int> *SAc = nullptr;    //  SAc[c]  = [hash1(r, ...) x u] (list of u copies of same hash)
+
+// Let col c be sampled from B, and it is the (c')th sampled row.
+// Then for all indices [(r_1,c), (r_2,c), ..., (r_v,c)] in the col:
+std::vector<int> *SBc = nullptr;    // SBc[c']  = r
+std::vector<int> *SB = nullptr;     // SB[r]    = [hash2(c, ...) x v] (list of v copies of same hash)
 int *SAindex = nullptr, *SBcindex = nullptr;
 
 extern double ha1, hb1;
