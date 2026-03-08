@@ -51,17 +51,6 @@ int *tmpC = nullptr;
 // start of current block (NOTE(ejs): block == tile?)
 int TI, TJ, TK;
 
-bool ISDYNAMICJ = 0;
-// dynamic j, play same as jjj
-int dynj;
-
-bool ISDYNAMICK = 0;
-// dynamic k, play same as kkk
-int dynk;
-
-bool ISDYNAMICI = 0;
-int dyni;
-
 bool check_outer_loop() {
   if ((interorder == KIJ) || (interorder == KJI)) {
     return TK < K;
@@ -124,7 +113,7 @@ void updateBlockA() {
       // solution: add a update fuction after pre-load B
 
       // check: will pre_load use this currsizeA and currsizeB ? -> cause cycle
-      while (tmpj < maxj && A[ti][tmpj] < ((ISDYNAMICJ) ? dynj : jjj) + TJ) {
+      while (tmpj < maxj && A[ti][tmpj] < jjj + TJ) {
         tmpj++;
       }
 
@@ -135,7 +124,7 @@ void updateBlockA() {
   // Col-majored
   if (dataflow == Outer) {
 
-    for (int tj = TJ; tj < TJ + ((ISDYNAMICJ) ? dynj : jjj); tj++) {
+    for (int tj = TJ; tj < TJ + jjj; tj++) {
       if (tj > J)
         break;
 
@@ -156,14 +145,14 @@ void updateBlockB() {
   // Row-majored
   if (dataflow == Gust || dataflow == Outer) {
 
-    for (int tj = TJ; tj < TJ + ((ISDYNAMICJ) ? dynj : jjj); tj++) {
+    for (int tj = TJ; tj < TJ + jjj; tj++) {
       if (tj > J)
         break;
 
       int startk = beginB[tj], tmpk = beginB[tj],
           maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
-      while (tmpk < maxk && B[tj][tmpk] < ((ISDYNAMICK) ? dynk : kkk) + TK) {
+      while (tmpk < maxk && B[tj][tmpk] < kkk + TK) {
         tmpk++;
       }
 
@@ -174,14 +163,14 @@ void updateBlockB() {
   // Col-majored
   if (dataflow == Inner) {
 
-    for (int tk = TK; tk < TK + ((ISDYNAMICK) ? dynk : kkk); tk++) {
+    for (int tk = TK; tk < TK + kkk; tk++) {
       if (tk > K)
         break;
 
       int startj = beginBc[tk], tmpj = beginBc[tk],
           maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
-      while (tmpj < maxj && Bc[tk][tmpj] < ((ISDYNAMICJ) ? dynj : jjj) + TJ) {
+      while (tmpj < maxj && Bc[tk][tmpj] < jjj + TJ) {
         tmpj++;
       }
 
@@ -307,7 +296,7 @@ void AllupdateBeginA() {
 
 // each time update TI
 void updateBeginAc() {
-  for (int tj = TJ; tj < TJ + ((ISDYNAMICJ) ? dynj : jjj); tj++) {
+  for (int tj = TJ; tj < TJ + jjj; tj++) {
     if (tj > J)
       break;
 
@@ -365,7 +354,7 @@ void AllupdateBeginBc() {
 void updateBeginB() {
 
   // update beginB
-  for (int tj = TJ; tj < TJ + ((ISDYNAMICJ) ? dynj : jjj); tj++) {
+  for (int tj = TJ; tj < TJ + jjj; tj++) {
     if (tj > J)
       break;
 
@@ -384,7 +373,7 @@ void updateBeginB() {
 // eachtime update TJ
 void updateBeginBc() {
   // update beginBc
-  for (int tk = TK; tk < TK + ((ISDYNAMICK) ? dynk : kkk); tk++) {
+  for (int tk = TK; tk < TK + kkk; tk++) {
     if (tk > K)
       break;
 
@@ -455,7 +444,7 @@ void updateTI() {
 }
 
 void updateTJ() {
-  TJ += ((ISDYNAMICJ) ? dynj : jjj);
+  TJ += jjj;
 
   if (isIJ()) {
     updateBeginA();
@@ -471,7 +460,7 @@ void updateTJ() {
 }
 
 void updateTK() {
-  TK += ((ISDYNAMICK) ? dynk : kkk);
+  TK += kkk;
 
   if (isJK()) {
     updateBeginB();
@@ -483,50 +472,29 @@ void updateTK() {
 bool iterate_inner_loop() {
   if ((interorder == IJK) || (interorder == JIK)) {
     // adddyn
-    // dynamicupdatek();
-    if (TK + ((ISDYNAMICK) ? dynk : kkk) < K) {
+    if (TK + kkk < K) {
       updateTK();
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
       return 1;
     } else {
-      TK += ((ISDYNAMICK) ? dynk : kkk);
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
+      TK += kkk;
       return 0;
     }
   } else if ((interorder == IKJ) || (interorder == KIJ)) {
-    // dynamicupdatej();
-    if (TJ + ((ISDYNAMICJ) ? dynj : jjj) < J) {
+    if (TJ + jjj < J) {
       updateTJ();
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
       return 1;
     } else {
-      TJ += ((ISDYNAMICJ) ? dynj : jjj);
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
+      TJ += jjj;
       return 0;
     }
   } else if ((interorder == JKI) || (interorder == KJI)) {
     //  printf("####  %d %d %d\n", TI, iii, I);
-    // dynamicupdatei();
     if (TI + iii < I) {
       updateTI();
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 1;
 
     } else {
       TI += iii;
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 0;
     }
   }
@@ -536,48 +504,27 @@ bool iterate_inner_loop() {
 
 bool iterate_mid_loop() {
   if ((interorder == IKJ) || (interorder == JKI)) {
-    // dynamicupdatek();
-    if (TK + ((ISDYNAMICK) ? dynk : kkk) < K) {
+    if (TK + kkk < K) {
       updateTK();
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
       return 1;
     } else {
-      TK += ((ISDYNAMICK) ? dynk : kkk);
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
+      TK += kkk;
       return 0;
     }
   } else if ((interorder == IJK) || (interorder == KJI)) {
-    // dynamicupdatej();
-    if (TJ + ((ISDYNAMICJ) ? dynj : jjj) < J) {
+    if (TJ + jjj < J) {
       updateTJ();
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
       return 1;
     } else {
-      TJ += ((ISDYNAMICJ) ? dynj : jjj);
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
+      TJ += jjj;
       return 0;
     }
   } else if ((interorder == JIK) || (interorder == KIJ)) {
-    // dynamicupdatei();
     if (TI + iii < I) {
       updateTI();
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 1;
     } else {
       TI += iii;
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 0;
     }
   }
@@ -587,48 +534,27 @@ bool iterate_mid_loop() {
 
 bool iterate_outer_loop() {
   if ((interorder == KIJ) || (interorder == KJI)) {
-    // dynamicupdatek();
-    if (TK + ((ISDYNAMICK) ? dynk : kkk) < K) {
+    if (TK + kkk < K) {
       updateTK();
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
       return 1;
     } else {
-      TK += ((ISDYNAMICK) ? dynk : kkk);
-      if (ISDYNAMICK) {
-        dynamicupdatek();
-      }
+      TK += kkk;
       return 0;
     }
   } else if ((interorder == JIK) || (interorder == JKI)) {
-    // dynamicupdatej();
-    if (TJ + ((ISDYNAMICJ) ? dynj : jjj) < J) {
+    if (TJ + jjj < J) {
       updateTJ();
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
       return 1;
     } else {
-      TJ += ((ISDYNAMICJ) ? dynj : jjj);
-      if (ISDYNAMICJ) {
-        dynamicupdatej();
-      }
+      TJ += jjj;
       return 0;
     }
   } else if ((interorder == IJK) || (interorder == IKJ)) {
-    // dynamicupdatei();
     if (TI + iii < I) {
       updateTI();
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 1;
     } else {
       TI += iii;
-      if (ISDYNAMICI) {
-        dynamicupdatei();
-      }
       return 0;
     }
   }
@@ -1155,49 +1081,6 @@ void pre_load_B() {
         }
       }
 
-      if (ISDYNAMICJ) {
-
-        // dynamic growing if the buffer is not full!
-        if (fulltagB == 0) {
-
-          // start to grow from the last tj
-          for (; tj < J; tj++) {
-
-            // on-chip fiber start
-            Bsizenow++;
-
-            int startk = beginB[tj], tmpk = beginB[tj],
-                maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
-
-            while (tmpk < maxk && B[tj][tmpk] < kkk + TK) {
-              tmpk++;
-            }
-
-            int tmpsize = (tmpk - startk);
-
-            if (Bsizenow + tmpsize * 3 >= Bsize) {
-              dynj = tj - TJ;
-              break;
-            } else {
-
-              Bsizenow += tmpsize * 3;
-
-              preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-              preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-              preSramAccess += sramWriteBandwidth(tmpsize * 3 + 2);
-              AccessByte += tmpsize * 3 + 2;
-            }
-          }
-
-          dynj = tj - TJ;
-
-        } else {
-          // the buffer is already full. don't need to increase. (will it
-          // shrink? ) we can try both the two mode : shrink or not.
-
-          dynj = jjj;
-        }
-      }
     }
 
     if ((dataflow == Gust) && ((format == CC) || (format == RC))) {
@@ -1307,50 +1190,6 @@ void pre_load_B() {
         }
       }
 
-      // update the IP dynamic here
-      if (ISDYNAMICK) {
-
-        // dynamic growing if the buffer is not full!
-        if (fulltagB == 0) {
-
-          // start to grow from the last tk
-          for (; tk < K; tk++) {
-
-            // on-chip fiber start
-            Bsizenow++;
-
-            int startj = beginBc[tk], tmpj = beginBc[tk],
-                maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-            while (tmpj < maxj && Bc[tk][tmpj] < jjj + TJ) {
-              tmpj++;
-            }
-
-            int tmpsize = (tmpj - startj);
-
-            if (Bsizenow + tmpsize * 3 >= Bsize) {
-              dynk = tk - TK;
-              break;
-            } else {
-
-              Bsizenow += tmpsize * 3;
-
-              preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-              preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-              preSramAccess += sramWriteBandwidth(tmpsize * 3 + 2);
-              AccessByte += tmpsize * 3 + 2;
-            }
-          }
-
-          dynk = tk - TK;
-
-        } else {
-          // the buffer is already full. don't need to increase. (will it
-          // shrink? ) we can try both the two mode : shrink or not.
-
-          dynk = kkk;
-        }
-      }
     }
 
     if ((dataflow == Inner) && (((format == RR) || (format == CR)))) {
@@ -1363,7 +1202,7 @@ void pre_load_B() {
       Bsizenow += kkk;
 
       // initialize
-      for (int tk = TK; tk < TK + ((ISDYNAMICK) ? dynk : kkk); tk++) {
+      for (int tk = TK; tk < TK + kkk; tk++) {
         bufferedsizeB[tk] = 0;
       }
 
@@ -1376,7 +1215,7 @@ void pre_load_B() {
 
         while (tmpk < maxk) {
           int tmpindex = B[tj][tmpk];
-          if (tmpindex >= TK + ((ISDYNAMICK) ? dynk : kkk)) {
+          if (tmpindex >= TK + kkk) {
             break;
           }
           tmpk++;
@@ -1413,7 +1252,7 @@ void pre_load_B() {
   // scenario 2: mismatch
 
   // mismatch of the Gust and Inner have been considered in scenario 1
-  if ((dataflow == Outer)) {
+  if (dataflow == Outer) {
 
     Bsizenow = 0;
     fulltagB = 0;
@@ -1773,7 +1612,7 @@ void updateCAccess(int ii) {
     // increase)
     int deltaC = 0;
     // int oldsize = bufferedClen[ii];
-    for (int k1 = TK; k1 < TK + ((ISDYNAMICK) ? dynk : kkk); k1++) {
+    for (int k1 = TK; k1 < TK + kkk; k1++) {
       if (tmpC[k1]) {
         // the k1 is a new element
         if (bufferedC[ii].find(k1) == bufferedC[ii].end()) {
@@ -1818,7 +1657,7 @@ void updateCAccess(int ii) {
     // update with compute
     int cntc = 0;
 
-    for (int k1 = TK; k1 < TK + ((ISDYNAMICK) ? dynk : kkk); k1++) {
+    for (int k1 = TK; k1 < TK + kkk; k1++) {
       if (tmpC[k1]) {
         cntc++;
       }
@@ -1851,7 +1690,7 @@ void get_B_fibers(int ii) {
       tmpC[k1] = 0;
     }
 
-    while (tmpj < maxj && A[ii][tmpj] < TJ + ((ISDYNAMICJ) ? dynj : jjj)) {
+    while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
       // coordinate of required B fiber
       int jj = A[ii][tmpj];
 
@@ -1966,7 +1805,7 @@ bool prefetchrow(int ii) {
   int tmpj = beginA[ii];
   int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
-  while (tmpj < maxj && A[ii][tmpj] < TJ + ((ISDYNAMICJ) ? dynj : jjj)) {
+  while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
     // coordinate of required B fiber
     // in this prefetch: push the next access queue of jj a ii
     int jj = A[ii][tmpj];
@@ -2434,7 +2273,7 @@ void calculate() {
     if (dataflow == Inner) {
 
       // update B here
-      for (int k = TK; k < TK + ((ISDYNAMICK) ? dynk : kkk); k++) {
+      for (int k = TK; k < TK + kkk; k++) {
         get_B_fiber_col_iii(k, iii);
       }
 
@@ -2453,7 +2292,7 @@ void calculate() {
         int maxj = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
 
         // tmpc = 0
-        for (int k1 = TK; k1 < TK + ((ISDYNAMICK) ? dynk : kkk); k1++) {
+        for (int k1 = TK; k1 < TK + kkk; k1++) {
           tmpC[k1] = 0;
         }
 
@@ -2524,7 +2363,7 @@ void calculate() {
       }
     }
   }
-  if ((dataflow == Outer)) {
+  if (dataflow == Outer) {
 
     for (int jj = 0; jj < jjj; jj++) {
       get_A_fiber_col(TJ + jj);
@@ -2787,7 +2626,7 @@ void postTileMerge() {
   }
 
   // calculate the inter-cost of outer
-  if ((dataflow == Outer)) {
+  if (dataflow == Outer) {
 
     for (int ii = 0; ii < I; ii++) {
 
@@ -2882,41 +2721,9 @@ void run() {
   analyze_statistics();
 }
 
-void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
-             long long ttj, long long ttk, long long SmallestTile)
+void runTile(int /* iii */, int jjj, int kkk, long long tti, long long ttj, long long ttk, long long SmallestTile)
 {
     assert(ISCACHE);
-
-  // only prunning in the estimation mode
-  if (isest) {
-    long long mosttotalonchip = (nzB / (tti * ttj * ttk)) * 3LL;
-
-    if (mosttotalonchip * 100LL < cachesize) {
-      return;
-    }
-
-    prefetchNow = 0;
-    prefetchRowNow = 0;
-
-    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
-        cacheScheme == CACHE_SCHEME_SPARCH) {
-      for (int j = 0; j < J; j++) {
-        while (!nextposvector[j].empty()) {
-          nextposvector[j].pop();
-        }
-      }
-    }
-    if (cacheScheme == 66) {
-      for (int j = 0; j < J; j++) {
-        LFUtag[j] = 0;
-      }
-    }
-
-    // pruning
-    if (((long long)jjj * kkk) * 4 < SmallestTile) {
-      return;
-    }
-  }
 
     // deal with the opt metadata
     if (cacheScheme == 6 || cacheScheme == 7) {
@@ -2972,10 +2779,6 @@ void runTile(bool isest, int /* iii */, int jjj, int kkk, long long tti,
 
     fflush(stdout);
 
-    if (isest) {
-        gustest(0);
-    } else {
-        run();
-    }
+    run();
 
 }

@@ -7,13 +7,11 @@ extern bool adaptive_prefetch;
 
 extern int minBlock;
 
-extern bool ISDYNAMICJ, ISDYNAMICK, ISDYNAMICI;
-
 extern int cacheScheme;
 
 void configPartial(float partialA, float partialB, float partialC);
 void reinitialize();
-void runTile(bool isest, int iii, int jjj, int kkk, long long tti,
+void runTile(int iii, int jjj, int kkk, long long tti,
              long long ttj, long long ttk, long long SmallestTile);
 void run();
 

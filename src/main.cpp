@@ -434,11 +434,6 @@ int main(int argc, char *argv[]) {
   // int ibound = getibound();
 
   int usesearchedtile = 1;
-  if (usesearchedtile) { // NOTE(ejs): this branch is **useless** (it is always taken)
-
-    ISDYNAMICJ = 0;
-    ISDYNAMICK = 0;
-    ISDYNAMICI = 0;
 
     int t_i, t_j, t_k;
 
@@ -476,7 +471,7 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
 
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       adaptive_prefetch = 0;
       useVirtualTag = 0;
@@ -493,7 +488,7 @@ int main(int argc, char *argv[]) {
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
       setSET();
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       fflush(stdout);
 
@@ -522,7 +517,7 @@ int main(int argc, char *argv[]) {
         newttk = (K + kkk - 1) / kkk;
         cachesize -= kkk * 2;
       }
-      runTile(0, iii, jjj, newkkk, tti, newttk, ttj, 0);
+      runTile(iii, jjj, newkkk, tti, newttk, ttj, 0);
       // return to the default setting
       CACHEBLOCK = 16;
       CACHEBLOCKLOG = 4;
@@ -542,7 +537,7 @@ int main(int argc, char *argv[]) {
       CACHEBLOCK = 4;
       CACHEBLOCKLOG = 2;
       setSET();
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       // return to the default setting
       CACHEBLOCK = 16;
@@ -571,7 +566,7 @@ int main(int argc, char *argv[]) {
       cacheScheme;
       cachesize = inputcachesize;
 
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
       adaptive_prefetch = 0;
       useVirtualTag = 0;
       *****************************************/
@@ -591,7 +586,7 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_BASE;
       cachesize = inputcachesize;
       setSET();
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
            "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -601,7 +596,7 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_MAPPING;
       cachesize = inputcachesize;
       setSET();
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "
            "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -610,7 +605,7 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 6;
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
 
       puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 with virtue   "
            "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -620,7 +615,7 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 6;
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
       useVirtualTag = 0;
 
       puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
@@ -628,10 +623,9 @@ int main(int argc, char *argv[]) {
       cacheScheme = CACHE_SCHEME_FLFU;
       cachesize = inputcachesize;
       prefetchSize = cachesize / 16;
-      runTile(0, iii, jjj, kkk, tti, ttk, ttj, 0);
+      runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
       useVirtualTag = 0;
     }
-  }
 
   return 0;
 }
