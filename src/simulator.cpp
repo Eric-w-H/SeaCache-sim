@@ -51,41 +51,6 @@ int *tmpC = nullptr;
 // start of current block (NOTE(ejs): block == tile?)
 int TI, TJ, TK;
 
-bool check_outer_loop() {
-  if ((interorder == KIJ) || (interorder == KJI)) {
-    return TK < K;
-  } else if ((interorder == JIK) || (interorder == JKI)) {
-    return TJ < J;
-  } else if ((interorder == IJK) || (interorder == IKJ)) {
-    return TI < I;
-  }
-  return 0;
-}
-
-bool check_inner_loop() {
-
-  if ((interorder == IJK) || (interorder == JIK)) {
-    return (TK < K);
-  } else if ((interorder == IKJ) || (interorder == KIJ)) {
-    return (TJ < J);
-  } else if ((interorder == JKI) || (interorder == KJI)) {
-    return (TI < I);
-  }
-  return 0;
-}
-
-bool check_mid_loop() {
-
-  if ((interorder == IKJ) || (interorder == JKI)) {
-    return (TK < K);
-  } else if ((interorder == IJK) || (interorder == KJI)) {
-    return (TJ < J);
-  } else if ((interorder == JIK) || (interorder == KIJ)) {
-    return (TI < I);
-  }
-  return 0;
-}
-
 // STAR: call this
 // when: 1) start time 2) each time update I/J
 // can over called by call each time
@@ -176,68 +141,6 @@ void updateBlockB() {
 
       currsizeBc[tk] = tmpj - startj;
     }
-  }
-}
-
-void updateBlockC() {
-
-  // Don't have determined beginC and currsizeC
-}
-
-// beginA only related to TJ -> call every time update TJ
-void forcebeginA() {
-  for (int i = 0; i < I; i++) {
-
-    // int startj = 0;
-    int tmpj = 0;
-    int maxj = offsetarrayA[i + 1] - offsetarrayA[i];
-
-    // here is TJ because TJ have added jjj before call the func
-    while (tmpj < maxj && A[i][tmpj] < TJ) {
-      tmpj++;
-    }
-
-    beginA[i] = tmpj;
-  }
-
-  for (int tj = 0; tj < J; tj++) {
-    // int starti = 0;
-    int tmpi = 0;
-    int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-    while (tmpi < maxi && Ac[tj][tmpi] < TI) {
-      tmpi++;
-    }
-    beginAc[tj] = tmpi;
-  }
-}
-
-void forcebeginB() {
-
-  for (int tj = 0; tj < J; tj++) {
-
-    // int startk = 0;
-    int tmpk = 0;
-    int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
-
-    while (tmpk < maxk && B[tj][tmpk] < TK) {
-      tmpk++;
-    }
-
-    beginB[tj] = tmpk;
-  }
-
-  for (int tk = 0; tk < K; tk++) {
-
-    // int startj = 0;
-    int tmpj = 0;
-    int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-    while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
-      tmpj++;
-    }
-
-    beginBc[tk] = tmpj;
   }
 }
 
@@ -387,34 +290,6 @@ void updateBeginBc() {
 
     beginBc[tk] = tmpj;
   }
-}
-
-void updateBeginC() {}
-
-void reinitialize_beginA() {
-  for (int ti = 0; ti < I; ti++) {
-    beginA[ti] = 0;
-  }
-}
-void reinitialize_beginAc() {
-  for (int tj = 0; tj < J; tj++) {
-    beginAc[tj] = 0;
-  }
-}
-void reinitialize_beginB() {
-  for (int tj = 0; tj < J; tj++) {
-    beginB[tj] = 0;
-  }
-}
-void reinitialize_beginBc() {
-  for (int tk = 0; tk < K; tk++) {
-    beginBc[tk] = 0;
-  }
-}
-void reinitialize_beginC() {
-  /* for(int ti = 0; ti < I; ti ++){
-       beginC[ti] = 0;
-   }*/
 }
 
 // return 1 if I is before J in the interorder
@@ -629,26 +504,6 @@ void reverse_K() {
   }
 
   // }
-}
-
-void reverse_inner() {
-  if ((interorder == IJK) || (interorder == JIK)) {
-    reverse_K();
-  } else if ((interorder == IKJ) || (interorder == KIJ)) {
-    reverse_J();
-  } else if ((interorder == JKI) || (interorder == KJI)) {
-    reverse_I();
-  }
-}
-
-void reverse_mid() {
-  if ((interorder == IKJ) || (interorder == JKI)) {
-    reverse_K();
-  } else if ((interorder == IJK) || (interorder == KJI)) {
-    reverse_J();
-  } else if ((interorder == JIK) || (interorder == KIJ)) {
-    reverse_I();
-  }
 }
 
 void reinitialize_inner() {
@@ -2565,11 +2420,16 @@ void reinitialize() {
   }
 
   // reinitialize management dtaa
-  reinitialize_beginA();
-  reinitialize_beginAc();
-  reinitialize_beginB();
-  reinitialize_beginBc();
-  reinitialize_beginC();
+  for (int ti = 0; ti < I; ti++) {
+    beginA[ti] = 0;
+  }
+  for (int tj = 0; tj < J; tj++) {
+    beginAc[tj] = 0;
+    beginB[tj]  = 0;
+  }
+  for (int tk = 0; tk < K; tk++) {
+    beginBc[tk] = 0;
+  }
 }
 
 int getcntc(int ii) {
@@ -2683,11 +2543,6 @@ void run() {
         if (ISCACHE) {
           initializeCacheValid();
         }
-
-        // force for just test
-        //  ensure the begin is right (with TI,TJ,TK)
-        // forcebeginA();
-        // forcebeginB();
 
         pre_calculate_load();
 
