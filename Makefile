@@ -68,6 +68,12 @@ $(DEBUG_DIR)/$(TARGET): $(DEBUG_OBJS) | $(DEBUG_DIR)
 
 $(foreach f,$(SRC),$(eval $(call OBJ_COMP_TEMPLATE,$(DEBUG_DIR),$(f),$(DEBUG_CPPFLAGS))))
 
+OMP_PATH := $(shell brew --prefix libomp)
+bin:
+	clang++ -std=c++14 -O3 -march=native -I"$(OMP_PATH)/include" -L"$(OMP_PATH)/lib" -lomp \
+	src/config.cpp src/data.cpp src/estimation.cpp src/parameters.cpp \
+	src/util.cpp src/statistics.cpp src/cache.cpp src/dynamic.cpp src/simulator.cpp src/main.cpp -o scache
+
 #-------------------------------------------------- 
 # Helpful phonies
 #-------------------------------------------------- 

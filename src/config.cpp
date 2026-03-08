@@ -10,7 +10,7 @@ int sramWritePort;
 
 // DRAM bandwidth
 double memoryBandwidthWhole(long long ss) {
-  return (ss + HBMbandwidth - 1) / HBMbandwidth;
+    return (ss + HBMbandwidth - 1) / HBMbandwidth;
 }
 
 // bandwidth per PE
