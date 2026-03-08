@@ -72,9 +72,17 @@ int cachecycle = 0;
 // whole: load the whole cacheline anyway. partial: only load a part (need more
 // hardware change ) to support partial: need a extra metadata to track whether
 // a fiber is valid. (not very expensive. only one bit per each fiber)
-//                  start addr     exceed part      not full part
+//                  start addr     exceed part      not full part                work
 // cache Scheme 0       fiber       cut                 whole
 // cache Scheme 1       fiber       split               whole
+// cache Scheme 4       addr        split               whole
+// cache Scheme 6: scheme 1 + OPT                                                SPARCH
+// cache Scheme 11100: scheme0 + static OPT                                      INNERSP
+// cache Scheme 11101: sceme0 + dynamic OPT                                      SPARCH
+// cache Scheme 66: scheme6 + LFU prefetch + hybrid bit (fewer hardware cost)    SCACHE
+// cache Scheme 88: refers to the practical FLFU (enabling 4-bit, virtual tag)   SCACHE
+//   (virtual tag can be configured or not (baseline)) the flu information is 
+//   no longer kept in the LFUtag, but the extra lfubit
 int cacheScheme;
 
 long long getCacheAddr(int fiberid, int relative) {
@@ -1039,28 +1047,30 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 // (re-)allocate memory dynamically
 int last_cache_set = 0;
 void initialize_cache() {
-  if(SET != last_cache_set) {
+  // Only allocate on growth, this function gets called semi-frequently
+  if(SET > last_cache_set) {
     deinitialize_cache();
     last_cache_set = SET;
-  }
-  try {
-    Valid = new bool[SET * SETASSOC]();
-    Tag = new int[SET * SETASSOC]();
-    lrubit = new int[SET * SETASSOC]();
-    lfubit = new int[SET * SETASSOC]();
 
-    virtualValid = new bool[SET * VIRTUALSETASSOC]();
-    virtualTag = new int[SET * VIRTUALSETASSOC]();
-    virtuallfubit = new int[SET * VIRTUALSETASSOC]();
+    try {
+      Valid = new bool[SET * SETASSOC]();
+      Tag = new int[SET * SETASSOC]();
+      lrubit = new int[SET * SETASSOC]();
+      lfubit = new int[SET * SETASSOC]();
 
-    PosOrig = new unsigned short[SET * SETASSOC]();
-    vPosOrig = new unsigned short[SET * SETASSOC]();
+      virtualValid = new bool[SET * VIRTUALSETASSOC]();
+      virtualTag = new int[SET * VIRTUALSETASSOC]();
+      virtuallfubit = new int[SET * VIRTUALSETASSOC]();
 
-    Cnt = new unsigned char[SET * SETASSOC]();
-    Next = new bool[SET * SETASSOC]();
-  } catch (const std::bad_alloc &e) {
-    std::cerr << "Error allocating memory for " << e.what() << std::endl;
-    std::exit(1);
+      PosOrig = new unsigned short[SET * SETASSOC]();
+      vPosOrig = new unsigned short[SET * SETASSOC]();
+
+      Cnt = new unsigned char[SET * SETASSOC]();
+      Next = new bool[SET * SETASSOC]();
+    } catch (const std::bad_alloc &e) {
+      std::cerr << "Error allocating memory for " << e.what() << std::endl;
+      std::exit(1);
+    }
   }
 }
 

@@ -60,6 +60,12 @@ int dynk;
 bool ISDYNAMICI = 0;
 int dyni;
 
+// For dynamic prefetch
+bool lastaccept = 1;
+double SA_FINAL_TEMP = 0.000001;
+bool SAstage = 0;
+
+
 int PartialConfig;
 
 bool check_outer_loop() {
@@ -2143,6 +2149,9 @@ void initialize_adaptive_prefetch(long long, long long, int, int, int) {
   data_access_misses = 0;
   data_access_hit = 0;
   data_access_total = 0;
+
+  lastaccept = 1;
+  SAstage = false;
 }
 
 int get_num_samples(double current_temperature) {
@@ -2155,12 +2164,6 @@ int get_num_samples(double current_temperature) {
     return 16;
   }
 }
-
-bool lastaccept = 1;
-
-double SA_FINAL_TEMP = 0.000001;
-
-bool SAstage = 0;
 
 void update_prefetch_size() {
   double temperature = SA_INITIAL_TEMP * pow(SA_COOLING_RATE, sa_iteration_k);
@@ -2227,6 +2230,7 @@ void update_prefetch_size() {
     return;
   }
 
+  // These few lines to the IF implement a MCMC algorithm
   double current_data_miss_rate =
       1.0 - ((double)(data_access_hit) / data_access_total);
 
