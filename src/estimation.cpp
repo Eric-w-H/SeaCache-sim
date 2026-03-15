@@ -399,7 +399,6 @@ void getParameterSample() {
     while (!hashqur.empty())
         hashqur.pop();
 
-    int tmpnnzc = 0;
     for (int i = 0; i < SIcnt; i++) {
         for (int k = 0; k < SKcnt; k++) {
 
@@ -419,7 +418,6 @@ void getParameterSample() {
                     if (hashset.find(tmph) == hashset.end()) {
                         hashset.insert(tmph);
                         tmpflag = 1;
-                        tmpnnzc++;
                         break;
                     }
                     // hashqu.push();
@@ -430,8 +428,6 @@ void getParameterSample() {
             }
         }
     }
-
-    // printf("tmpnnzc: %d\n", tmpnnzc);
 
     // first convert the set to queue
     for (const auto &element : hashset) {
@@ -814,189 +810,4 @@ long long gustest(int estsum) {
     }
 
     return esttotal;
-}
-
-long long tilecnt[512][512];
-
-void postEstAdjust() {
-    // the prior-stage est:
-    // estiii, estjjj, estkkk
-    // esttti, estttj, estttk
-    // now we are going to fine-tune it
-    // (pre-stage finetune; run-time finetune(dynamic))
-
-    // first: get the accurate hitrate of the current tiling
-    // second: get the accurate hitrate of the finer tiling on J and K
-    // if a road is better, than continue; else stop finer
-
-    printf("\n\npostAdjust: iii jjj kkk: %d %d %d\n", estiii, estjjj, estkkk);
-    fflush(stdout);
-
-    memset(tilecnt, 0, sizeof(tilecnt));
-
-    // int iii2 = (estiii + 1) / 2;
-    int jjj2 = (estjjj + 1) / 2;
-    int kkk2 = (estkkk + 1) / 2;
-    // int tti2 = esttti * 2;
-    int ttj2 = estttj * 2;
-    int ttk2 = estttk * 2;
-
-    for (int k = 0; k < SKcnt; k++) {
-        int tmpszb = SBc[k].size();
-        for (int j = 0; j < tmpszb; j++) {
-            int tmpj = SBc[k][j];
-            int tmpk = SBcindex[k];
-
-            // to calculate how many nnzs in each tile
-            tilecnt[tmpj / jjj2][tmpk / kkk2]++;
-        }
-    }
-
-    // calculate 4 versions
-
-    // J+K type0
-    // int outtile = 0;
-    long long estsum = 0;
-    for (int tj = 0; tj < ttj; tj++) {
-        for (int tk = 0; tk < ttk; tk++) {
-            long long sizejk =
-                ((tilecnt[tj * 2][tk * 2] + tilecnt[tj * 2][tk * 2 + 1] +
-                  tilecnt[tj * 2 + 1][tk * 2] + tilecnt[tj * 2 + 1][tk * 2 + 1]) /
-                 samplep) *
-                    3LL +
-                jjj;
-
-            if (sizejk < Bsize) {
-                estsum += sizejk;
-            } else {
-                estsum += Bsize;
-            }
-        }
-    }
-    iii = estiii;
-    jjj = estjjj;
-    kkk = estkkk;
-    tti = esttti;
-    ttj = estttj;
-    ttk = estttk;
-
-    long long mintime = gustest(estsum / (ttj * ttk));
-    int mintype = 0;
-
-    // J/2+K type1
-
-    // outtile = 0;
-    estsum = 0;
-    for (int tj = 0; tj < ttj2; tj++) {
-        for (int tk = 0; tk < ttk; tk++) {
-            long long sizejk =
-                ((tilecnt[tj][tk * 2] + tilecnt[tj][tk * 2 + 1]) / samplep) * 3LL +
-                jjj2;
-
-            if (sizejk < Bsize) {
-                estsum += sizejk;
-            } else {
-                estsum += Bsize;
-            }
-        }
-    }
-    iii = estiii;
-    jjj = jjj2;
-    kkk = estkkk;
-    tti = esttti;
-    ttj = ttj2;
-    ttk = estttk;
-
-    long long tmptime = gustest(estsum / (ttj2 * ttk));
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 1;
-    }
-
-    // J+K/2 type2
-
-    // outtile = 0;
-    estsum = 0;
-    for (int tj = 0; tj < ttj; tj++) {
-        for (int tk = 0; tk < ttk2; tk++) {
-            long long sizejk =
-                ((tilecnt[tj * 2][tk] + tilecnt[tj * 2 + 1][tk]) / samplep) * 3LL +
-                jjj;
-
-            if (sizejk < Bsize) {
-                estsum += sizejk;
-            } else {
-                estsum += Bsize;
-            }
-        }
-    }
-    iii = estiii;
-    jjj = estjjj;
-    kkk = kkk2;
-    tti = esttti;
-    ttj = estttj;
-    ttk = ttk2;
-
-    tmptime = gustest(estsum / (ttj * ttk2));
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 2;
-    }
-
-    // J/2+K/2  type3
-
-    // outtile = 0;
-    estsum = 0;
-    for (int tj = 0; tj < ttj2; tj++) {
-        for (int tk = 0; tk < ttk2; tk++) {
-            long long sizejk = (tilecnt[tj][tk] / samplep) * 3LL + jjj2;
-
-            if (sizejk < Bsize) {
-                estsum += sizejk;
-            } else {
-                estsum += Bsize;
-            }
-        }
-    }
-    iii = estiii;
-    jjj = jjj2;
-    kkk = kkk2;
-    tti = esttti;
-    ttj = ttj2;
-    ttk = ttk2;
-
-    tmptime = gustest(estsum / (ttj2 * ttk2));
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 3;
-    }
-
-    if (mintype == 0) {
-        // don't devide anymore is the best choice
-        return;
-    }
-
-    if (mintype == 1) {
-        estjjj = (estjjj + 1) / 2;
-        ttj *= 2;
-        postEstAdjust();
-
-        return;
-    }
-
-    if (mintype == 2) {
-        estkkk = (estkkk + 1) / 2;
-        ttk *= 2;
-        postEstAdjust();
-        return;
-    }
-
-    if (mintype == 3) {
-        estjjj = (estjjj + 1) / 2;
-        estkkk = (estkkk + 1) / 2;
-        ttj *= 2;
-        ttk *= 2;
-        postEstAdjust();
-        return;
-    }
 }

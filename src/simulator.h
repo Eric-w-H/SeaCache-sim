@@ -18,6 +18,16 @@ extern int *beginB;
 
 extern int TI, TJ, TK;
 
+// Tcnt are for counting non-zeros in each subtile
+// initialize to 0 at each round
+extern int Tcnt[2][2];
+// store the now sum of sizejk in ttjsum*ttksum tiles
+// store all 7 types
+extern long long sizejksum[10];
+// ttjsum, ttksum means the now ttj*ttk
+// initialize to zero if jjj*kkk changes,
+extern int tilesum;
+
 void initialize_simulator();
 void deinitialize_simulator();
 

@@ -1,10 +1,15 @@
 #include <assert.h>
 
 #include "cache.h"
-#include "dynamic.h"
 #include "estimation.h"
 #include "headers.h"
 #include "statistics.h"
+
+// >> from dynamic.cpp
+int Tcnt[2][2];
+long long sizejksum[10];
+int tilesum;
+// <<
 
 // store all the buffered C now
 set<int> *bufferedC = nullptr;
@@ -676,9 +681,9 @@ void pre_load_B() {
 
                 int tmpsize = (tmpk - startk);
 
-                updateDynamicTile(_TJ, (halfk - startk), tmpk - halfk);
-                // Tcnt[_TJ][0] += (halfk-startk);
-                // Tcnt[_TJ][1] += (tmpk-halfk);
+                // update dynamic tile
+                Tcnt[_TJ][0] += halfk - startk;
+                Tcnt[_TJ][1] += tmpk  - halfk;
 
                 if (Bsizenow + tmpsize * 3 >= Bsize) {
                     if (!fulltagB) {
@@ -1175,10 +1180,6 @@ void get_B_fibers(int ii) {
             update_c_fiber(jj);
 
             tmpj++;
-
-            if (offsetarrayA[ii] + tmpj >= offsetarrayA[ii + 1]) {
-                break;
-            }
         }
 
         // update A access
@@ -1427,48 +1428,9 @@ bool prefetchrow(int ii) {
         }
 
         tmpj++;
-
-        if (offsetarrayA[ii] + tmpj >= offsetarrayA[ii + 1]) {
-            break;
-        }
     }
 
     return 1;
-}
-
-// void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
-//                                   int T_J) {
-void initialize_adaptive_prefetch() {
-    // --- Offline Phase ---
-    // double avg_nonzero_length_B;
-    // if (K > 0 && T_J > 0) {
-    //   avg_nonzero_length_B = static_cast<double>(nnzB) / K;
-    // } else {
-    //   avg_nonzero_length_B = 1.0;
-    // }
-
-    current_prefetch_size = 1.0 / 128.0;
-
-    prefetchSize = current_prefetch_size * inputcachesize;
-    cachesize = inputcachesize - prefetchSize;
-    setSET();
-
-    sa_iteration_k = 0;
-    previous_prefetch_size = current_prefetch_size;
-    best_prefetch_size = current_prefetch_size;
-    last_iteration_data_miss_rate = 1.0;
-    best_data_miss_rate = 1.0;
-
-    adjustment_interval = estEffMAC / 500;
-    if (adjustment_interval == 0)
-        adjustment_interval = 1000;
-
-    elements_processed_since_last_adjustment = 0;
-
-    prefetch_discards = 0;
-    data_access_misses = 0;
-    data_access_hit = 0;
-    data_access_total = 0;
 }
 
 int get_num_samples(double current_temperature) {
@@ -1785,10 +1747,6 @@ void calculate() {
                 update_c_fiber(jj);
 
                 tmpj++;
-
-                if (offsetarrayA[TI + ii] + tmpj >= offsetarrayA[TI + ii + 1]) {
-                    break;
-                }
             }
 
             updateCAccess(TI + ii);
@@ -1826,10 +1784,6 @@ void calculate() {
                 update_c_fiber(jj);
 
                 tmpj++;
-
-                if (offsetarrayA[ii] + tmpj >= offsetarrayA[ii + 1]) {
-                    break;
-                }
             }
 
             int cntc = 0;
@@ -2016,10 +1970,6 @@ int getcntc(int ii) {
         update_c_fiber(jj);
 
         tmpj++;
-
-        if (offsetarrayA[ii] + tmpj >= offsetarrayA[ii + 1]) {
-            break;
-        }
     }
 
     int cntc = 0;
@@ -2075,11 +2025,253 @@ void postTileMerge() {
     postCycle += max(postDramAccess, postSramAccess);
 }
 
+static inline
+void update_T()
+{
+    // finetune the tile size after each tile calculating it's Tcnt.
+    // similar to the static finetune stage
+
+    int oldiii = iii;
+    int oldjjj = jjj;
+    int oldkkk = kkk;
+
+    int oldtti = tti;
+    int oldttj = ttj;
+    int oldttk = ttk;
+
+    // int iii2 = (iii + 1) / 2;
+    int jjj2 = (jjj + 1) / 2;
+    int kkk2 = (kkk + 1) / 2;
+
+    // int tti2 = tti * 2;
+    int ttj2 = ttj * 2;
+    int ttk2 = ttk * 2;
+
+    // int estsum = 0;
+
+    // jjj+kkk type 0
+    // Tcnt need to clear and recalculate at each round, sizejksum and tilesum not
+    int sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 + oldjjj;
+    sizejksum[0] += min(sizejk, Bsize);
+    iii = oldiii;
+    jjj = oldjjj;
+    kkk = oldkkk;
+    tti = oldtti;
+    ttj = oldttj;
+    ttk = oldttk;
+    //  printf("!!! sizejksum:%lld  tilesum:%d\n", sizejksum[0], tilesum);
+    fflush(stdout);
+    long long mintime = gustest(sizejksum[0] / (tilesum));
+    int mintype = 0;
+
+    // jjj/2 + kkk type1
+    sizejk = (Tcnt[0][0] + Tcnt[0][1]) * 3 + jjj2;
+    sizejksum[1] += min(sizejk, Bsize);
+    sizejk = (Tcnt[1][0] + Tcnt[1][1]) * 3 + jjj2;
+    sizejksum[1] += min(sizejk, Bsize);
+
+    iii = oldiii;
+    jjj = jjj2;
+    kkk = oldkkk;
+    tti = oldtti;
+    ttj = ttj2;
+    ttk = oldttk;
+    long long tmptime = gustest(sizejksum[1] / (tilesum * 2));
+    tmptime *= 1.1;
+    if (tmptime < mintime) {
+        mintime = tmptime;
+        mintype = 1;
+    }
+
+    // jjj + kkk/2 type2
+    sizejk = (Tcnt[0][0] + Tcnt[1][0]) * 3 + oldjjj;
+    sizejksum[2] += min(sizejk, Bsize);
+    sizejk = (Tcnt[0][1] + Tcnt[1][1]) * 3 + oldjjj;
+    sizejksum[2] += min(sizejk, Bsize);
+
+    iii = oldiii;
+    jjj = oldjjj;
+    kkk = kkk2;
+    tti = oldtti;
+    ttj = oldttj;
+    ttk = ttk2;
+    tmptime = gustest(sizejksum[2] / (tilesum * 2));
+    tmptime *= 1.1;
+    if (tmptime < mintime) {
+        mintime = tmptime;
+        mintype = 2;
+    }
+
+    // jjj/2 + kkk/2 type3
+    sizejk = (Tcnt[0][0]) * 3 + jjj2;
+    sizejksum[3] += min(sizejk, Bsize);
+    sizejk = (Tcnt[0][1]) * 3 + jjj2;
+    sizejksum[3] += min(sizejk, Bsize);
+    sizejk = (Tcnt[1][0]) * 3 + jjj2;
+    sizejksum[3] += min(sizejk, Bsize);
+    sizejk = (Tcnt[1][1]) * 3 + jjj2;
+    sizejksum[3] += min(sizejk, Bsize);
+
+    iii = oldiii;
+    jjj = jjj2;
+    kkk = kkk2;
+    tti = oldtti;
+    ttj = ttj2;
+    ttk = ttk2;
+    tmptime = gustest(sizejksum[3] / (tilesum * 4));
+    tmptime *= 1.1;
+    if (tmptime < mintime) {
+        mintime = tmptime;
+        mintype = 3;
+    }
+
+    // only can increase when *2 < I/J/K, otherwise overflow
+    // jjj*2 + kkk type4
+    if (oldjjj * 2 < J) {
+        sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 +
+                oldjjj * 2;
+        sizejksum[4] += min(sizejk, Bsize);
+        iii = oldiii;
+        jjj = oldjjj * 2;
+        kkk = oldkkk;
+        tti = oldtti;
+        ttj = oldttj / 2;
+        ttk = oldttk;
+        tmptime = gustest(sizejksum[4] / (tilesum));
+        tmptime *= 1.1;
+        if (tmptime < mintime) {
+            mintime = tmptime;
+            mintype = 4;
+        }
+    }
+
+    // jjj + kkk*2 type5
+    if (oldkkk * 2 < K) {
+        sizejk =
+            (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 + oldjjj;
+        sizejksum[5] += min(sizejk, Bsize);
+        iii = oldiii;
+        jjj = oldjjj;
+        kkk = oldkkk * 2;
+        tti = oldtti;
+        ttj = oldttj;
+        ttk = oldttk / 2;
+        tmptime = gustest(sizejksum[5] / (tilesum));
+        tmptime *= 1.1;
+        if (tmptime < mintime) {
+            mintime = tmptime;
+            mintype = 5;
+        }
+    }
+
+    // jjj*2 + kkk*2 type6
+    if ((oldjjj * 2 < J) && (oldkkk * 2 < K)) {
+        sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 4 +
+                oldjjj * 2;
+        sizejksum[6] += min(sizejk, Bsize);
+        iii = oldiii;
+        jjj = oldjjj * 2;
+        kkk = oldkkk * 2;
+        tti = oldtti;
+        ttj = oldttj / 2;
+        ttk = oldttk / 2;
+        tmptime = gustest(sizejksum[6] / (tilesum));
+        tmptime *= 1.1;
+        if (tmptime < mintime) {
+            mintime = tmptime;
+            mintype = 6;
+        }
+    }
+
+    // jjj/2 + kkk*2  type7
+    if (oldkkk * 2 < K) {
+        sizejk = (Tcnt[0][0] + Tcnt[0][1]) * 3 * 2 + jjj2;
+        sizejksum[7] += min(sizejk, Bsize);
+
+        sizejk = (Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 + jjj2;
+        sizejksum[7] += min(sizejk, Bsize);
+
+        iii = oldiii;
+        jjj = jjj2;
+        kkk = oldkkk * 2;
+        tti = oldtti;
+        ttj = ttj2;
+        ttk = oldttk / 2;
+        tmptime = gustest(sizejksum[7] / (tilesum * 2));
+        tmptime *= 1.1;
+        if (tmptime < mintime) {
+            mintime = tmptime;
+            mintype = 7;
+        }
+    }
+
+    // jjj*2 + kkk/2 type8
+    if (oldjjj * 2 < J) {
+        sizejk = (Tcnt[0][0] + Tcnt[1][0]) * 3 * 2 + jjj;
+        sizejksum[8] += min(sizejk, Bsize);
+
+        sizejk = (Tcnt[0][1] + Tcnt[1][1]) * 3 * 2 + jjj;
+        sizejksum[8] += min(sizejk, Bsize);
+
+        iii = oldiii;
+        jjj = oldjjj * 2;
+        kkk = kkk2;
+        tti = oldtti;
+        ttj = oldttj / 2;
+        ttk = ttk2;
+        tmptime = gustest(sizejksum[8] / (tilesum * 2));
+        tmptime *= 1.1;
+        if (tmptime < mintime) {
+            mintime = tmptime;
+            mintype = 8;
+        }
+    }
+
+    // don't change the actual tiling here, (only change _iii/_jjj/_kkk)
+    // change until next time inter-tile update of i/j/k.
+    iii = oldiii;
+    jjj = oldjjj;
+    kkk = oldkkk;
+    tti = oldtti;
+    ttj = oldttj;
+    ttk = oldttk;
+}
+
 void run() {
     reinitialize();
 
     if (adaptive_prefetch) {
-        initialize_adaptive_prefetch();
+        // initialize adaptive prefetch
+        // --- Offline Phase ---
+        // double avg_nonzero_length_B;
+        // if (K > 0 && T_J > 0) {
+        //   avg_nonzero_length_B = static_cast<double>(nnzB) / K;
+        // } else {
+        //   avg_nonzero_length_B = 1.0;
+        // }
+
+        current_prefetch_size = 1.0 / 128.0;
+
+        prefetchSize = current_prefetch_size * inputcachesize;
+        cachesize = inputcachesize - prefetchSize;
+        setSET();
+
+        sa_iteration_k = 0;
+        previous_prefetch_size = current_prefetch_size;
+        best_prefetch_size = current_prefetch_size;
+        last_iteration_data_miss_rate = 1.0;
+        best_data_miss_rate = 1.0;
+
+        adjustment_interval = estEffMAC / 500;
+        if (adjustment_interval == 0)
+            adjustment_interval = 1000;
+
+        elements_processed_since_last_adjustment = 0;
+
+        prefetch_discards = 0;
+        data_access_misses = 0;
+        data_access_hit = 0;
+        data_access_total = 0;
     }
 
     if (iii > I)
@@ -2089,11 +2281,10 @@ void run() {
     if (kkk > K)
         kkk = K;
 
-    // initialize the finetune tile to the selected tile
-    initialTileSize();
-
     // initialize Tcnt before each tile running
-    reinitializecnt();
+    memset(Tcnt, 0, sizeof(Tcnt));
+    memset(sizejksum, 0, sizeof(sizejksum));
+    tilesum = 0;
 
     // reinitialize**: TI/TJ/TK to 0;  put beginA/B to 0
     reinitialize_outer();
@@ -2105,8 +2296,9 @@ void run() {
 
             reinitialize_inner();
             do {
-
-                initialDynamicTile();
+                // initial dynamic tile
+                tilesum++;
+                memset(Tcnt, 0, sizeof(Tcnt));
 
                 // need to initialize the cache each time change the tile
                 if (ISCACHE) {
@@ -2143,7 +2335,7 @@ void run() {
     analyze_statistics();
 }
 
-void runTile(int /* iii */, int jjj, int kkk, long long tti, long long ttj, long long ttk) {
+void runTile(int iii, int jjj, int kkk, long long tti, long long ttj, long long ttk) {
     assert(ISCACHE);
 
     // deal with the opt metadata

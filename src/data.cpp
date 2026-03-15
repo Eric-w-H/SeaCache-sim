@@ -14,7 +14,8 @@ int nzB;
 std::vector<int>
     *A = nullptr,  // A[r]  = [c_1, c_2, ..., c_u] are non-zero column indices in row r
     *Ac = nullptr, // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
-        *B = nullptr, *Bc = nullptr;
+    *B = nullptr,
+    *Bc = nullptr;
 
 std::vector<int> *sparchA = nullptr;
 
