@@ -12,8 +12,6 @@ set<int> *bufferedC = nullptr;
 // equals bufferedC[i].size()
 int *bufferedClen = nullptr;
 
-int BLOCKSIZE = 16;
-
 int *beginA = nullptr;
 int *beginB = nullptr;
 
@@ -42,7 +40,6 @@ The currently buffered size of each array
 
 update bufferedsize each time
 */
-int *bufferedsizeA = nullptr;
 int *bufferedsizeB = nullptr;
 // int *bufferedsizeC = nullptr;
 
@@ -61,11 +58,12 @@ currsize is consistent to dataflow order
 */
 void updateBlockA() {
 
-    // Row-majored
-    if (dataflow == Inner || dataflow == Gust) {
-
+    switch (dataflow) {
+    case Inner:
+    case Gust:
+        // Row-majored
         for (int ti = TI; ti < TI + iii; ti++) {
-            if (ti > I)
+            if (ti >= I)
                 break;
 
             int startj = beginA[ti], tmpj = beginA[ti];
@@ -84,13 +82,12 @@ void updateBlockA() {
 
             currsizeA[ti] = tmpj - startj;
         }
-    }
-
-    // Col-majored
-    if (dataflow == Outer) {
-
+        break;
+    
+    case Outer:
+        // Col-majored
         for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj > J)
+            if (tj >= J)
                 break;
 
             int starti = beginAc[tj], tmpi = beginAc[tj];
@@ -102,16 +99,18 @@ void updateBlockA() {
 
             currsizeAc[tj] = tmpi - starti;
         }
+        break;
     }
+
 }
 
 void updateBlockB() {
-
-    // Row-majored
-    if (dataflow == Gust || dataflow == Outer) {
-
+    switch (dataflow) {
+    case Outer:
+    case Gust:
+        // Row-majored
         for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj > J)
+            if (tj >= J)
                 break;
 
             int startk = beginB[tj], tmpk = beginB[tj],
@@ -123,13 +122,12 @@ void updateBlockB() {
 
             currsizeB[tj] = tmpk - startk;
         }
-    }
+        break;
 
-    // Col-majored
-    if (dataflow == Inner) {
-
+    case Inner:
+        // Col-majored
         for (int tk = TK; tk < TK + kkk; tk++) {
-            if (tk > K)
+            if (tk >= K)
                 break;
 
             int startj = beginBc[tk], tmpj = beginBc[tk],
@@ -141,13 +139,15 @@ void updateBlockB() {
 
             currsizeBc[tk] = tmpj - startj;
         }
+        break;
     }
+
 }
 
 // each time after update TJ
 void updateBeginA() {
     for (int ti = TI; ti < TI + iii; ti++) {
-        if (ti > I)
+        if (ti >= I)
             break;
 
         // int startj = beginA[ti];
@@ -165,9 +165,6 @@ void updateBeginA() {
 
 void ALLupdateBeginAc() {
     for (int tj = 0; tj < J; tj++) {
-        if (tj > J)
-            break;
-
         // int starti = beginAc[tj];
         int tmpi = beginAc[tj];
         int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
@@ -182,9 +179,6 @@ void ALLupdateBeginAc() {
 
 void AllupdateBeginA() {
     for (int ti = 0; ti < I; ti++) {
-        if (ti > I)
-            break;
-
         // int startj = beginA[ti];
         int tmpj = beginA[ti];
         int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
@@ -200,7 +194,7 @@ void AllupdateBeginA() {
 // each time update TI
 void updateBeginAc() {
     for (int tj = TJ; tj < TJ + jjj; tj++) {
-        if (tj > J)
+        if (tj >= J)
             break;
 
         // int starti = beginAc[tj];
@@ -219,10 +213,6 @@ void AllupdateBeginB() {
 
     // update beginB
     for (int tj = 0; tj < J; tj++) {
-        if (tj > J)
-            break;
-
-        // int startk = beginB[tj];
         int tmpk = beginB[tj];
         int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -238,10 +228,6 @@ void AllupdateBeginBc() {
 
     // update beginBc
     for (int tk = 0; tk < K; tk++) {
-        if (tk > K)
-            break;
-
-        // int startj = beginBc[tk];
         int tmpj = beginBc[tk];
         int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -258,10 +244,9 @@ void updateBeginB() {
 
     // update beginB
     for (int tj = TJ; tj < TJ + jjj; tj++) {
-        if (tj > J)
+        if (tj >= J)
             break;
 
-        // int startk = beginB[tj];
         int tmpk = beginB[tj];
         int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -277,10 +262,9 @@ void updateBeginB() {
 void updateBeginBc() {
     // update beginBc
     for (int tk = TK; tk < TK + kkk; tk++) {
-        if (tk > K)
+        if (tk >= K)
             break;
 
-        // int startj = beginBc[tk];
         int tmpj = beginBc[tk];
         int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -363,7 +347,6 @@ bool iterate_inner_loop() {
             return 0;
         }
     } else if ((interorder == JKI) || (interorder == KJI)) {
-        //  printf("####  %d %d %d\n", TI, iii, I);
         if (TI + iii < I) {
             updateTI();
             return 1;
@@ -441,7 +424,6 @@ void reverse_I() {
     TI = 0;
 
     // reinitialize A
-    // if((format == CR) || (format == CC)){
     if (isIJ()) {
         for (int tmpj = 0; tmpj < J; tmpj++) {
             beginAc[tmpj] = 0;
@@ -451,15 +433,12 @@ void reverse_I() {
             beginAc[tmpj] = 0;
         }
     }
-    //}
 }
 
 void reverse_J() {
 
     TJ = 0;
     // reinitialize A
-    // if((format == RR) || (format == RC)){
-
     if (isIJ()) {
         for (int tmpi = TI; tmpi < TI + iii; tmpi++) {
             beginA[tmpi] = 0;
@@ -469,11 +448,8 @@ void reverse_J() {
             beginA[tmpi] = 0;
         }
     }
-    // }
 
     // reinitialize Bc
-    // if((format == RC) || (format == CC)){
-
     if (isJK()) {
         for (int tmpk = 0; tmpk < K; tmpk++) {
             beginBc[tmpk] = 0;
@@ -483,15 +459,11 @@ void reverse_J() {
             beginBc[tmpk] = 0;
         }
     }
-
-    //}
 }
 
 void reverse_K() {
     TK = 0;
     // reinitialize B
-    // if((format == RR) || (format == CR)){
-
     if (isJK()) {
 
         for (int tmpj = TJ; tmpj < TJ + jjj; tmpj++) {
@@ -502,8 +474,6 @@ void reverse_K() {
             beginB[tmpj] = 0;
         }
     }
-
-    // }
 }
 
 void reinitialize_inner() {
@@ -549,7 +519,7 @@ int Bsizenow;
 int Csizenow;
 
 bool fulltagA, fulltagB, fulltagC;
-int fullA, fullB, fullC;
+int fullA, fullB;
 
 bool checkAndLoadReuseA() {
     if ((interorder == IJK || interorder == JIK)) {
@@ -558,9 +528,6 @@ bool checkAndLoadReuseA() {
         // buffer)
 
         // need to reaccess if the buffer can't hold the full A
-        // int restDram = 0;
-        // int restSram = 0;
-
         if (TK == 0) {
 
             Asizenow = 0;
@@ -570,7 +537,7 @@ bool checkAndLoadReuseA() {
                 // on-chip fiber start
 
                 for (int ti = TI; ti < TI + iii; ti++) {
-                    if (ti > I)
+                    if (ti >= I)
                         break;
                     Asizenow++;
 
@@ -602,39 +569,21 @@ bool checkAndLoadReuseA() {
                 }
             }
 
-            // haven't consider inconsistent format now
-            if (format == CR || format == CC) {
-            }
-
-            return 1;
-        } else {
-            return 1;
         }
-    } else {
 
-        // if interorder not IJK or JIK, can not buffer A whatever the buffersize
-        // so just set the fullA to TI-1 (the first place)
-        fulltagA = 1;
-        fullA = TI - 1;
+        return 1;
     }
 
-    return 0;
+    // if interorder not IJK or JIK, can not buffer A whatever the buffersize
+    // so just set the fullA to TI-1 (the first place)
+    fulltagA = 1;
+    fullA = TI - 1;
 
-    // need: the reusable inter loop + not the first tile (need to load at the
-    // first time)
-    if ((interorder == IJK || interorder == JIK) && (TK != 0))
-        return 1;
     return 0;
 }
 
 bool checkReuseB() {
     if ((interorder == JKI || interorder == KJI) && (TI != 0))
-        return 1;
-    return 0;
-}
-
-bool checkReuseC() {
-    if ((interorder == IKJ || interorder == KIJ) && (TJ != 0))
         return 1;
     return 0;
 }
@@ -653,194 +602,6 @@ void pre_load_A() {
         return;
     }
 
-    // we suppose a consistent format now, don't need the following
-    return;
-
-    // When need load A:
-    // 2 scenario: 1) When A storage format mismatch with dataflow. (Otherwise
-    // don't need to buffer A in 3 dataflow) 2) inter reuse A (load A at the first
-    // loop, then don't need to load again)
-    // -> the second scenario is not free!! need to alloc buffer for it; and can
-    // only reuse the partition inside the buffer
-
-    // mismatch of Gust
-
-    Asizenow = 0;
-    fulltagA = 0;
-
-    if ((dataflow == Gust) && ((format == CC) || (format == CR))) {
-        // implicit transform while loading
-
-        // estimated fiberlet fragment waste
-        Asize += ((fiberletlength + 1) / 2) * iii;
-
-        // on-chip fiber current
-        // This is why very bad before!!!
-        Asize += iii;
-
-        // Initialize
-        for (int ti = TI; ti < TI + iii; ti++) {
-            bufferedsizeA[ti] = 0;
-        }
-
-        for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj > J)
-                break;
-
-            int starti = beginAc[tj], tmpi = beginAc[tj],
-                maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-            while (tmpi < maxi) {
-                int tmpindex = Ac[tj][tmpi];
-                if (tmpindex >= TI + iii) {
-                    break;
-                }
-                tmpi++;
-
-                bufferedsizeA[tmpindex]++;
-            }
-
-            int tmpsize = (tmpi - starti);
-
-            if (Asizenow + tmpsize * 3 >= Asize) {
-                if (!fulltagA) {
-                    fulltagA = 1;
-                    fullA = tj;
-                }
-                // cache the csc size of each col block
-                // currsizeAc[tj] = tmpsize;
-            } else {
-                // currsizeAc[tj] = tmpsize;
-                preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                preA += memoryBandwidthWhole(tmpsize * 3 + 2);
-                AccessByte += tmpsize * 2 + 2;
-
-                // for each element need:
-                // 1) get pos: one read (current position)
-                // 2) add to chain: 1 data write; 1/block chain index write
-                preSramAccess += sramWriteBandwidth(tmpsize);
-                preSramAccess +=
-                    sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
-            }
-        }
-    }
-
-    // mismatch of IP
-
-    if ((dataflow == Inner) && ((format == CC) || (format == CR))) {
-        // implicit transform while loading
-
-        // estimated fiberlet fragment waste
-        Asize += ((fiberletlength + 1) / 2) * iii;
-
-        // on-chip fiber current
-        // This is why very bad before!!!
-        Asize += iii;
-
-        for (int ti = TI; ti < TI + iii; ti++) {
-            bufferedsizeA[ti] = 0;
-        }
-
-        for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj > J)
-                break;
-
-            int starti = beginAc[tj], tmpi = beginAc[tj],
-                maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-            while (tmpi < maxi) {
-                int tmpindex = Ac[tj][tmpi];
-                if (tmpindex >= TI + iii) {
-                    break;
-                }
-                tmpi++;
-
-                bufferedsizeA[tmpindex]++;
-            }
-
-            int tmpsize = (tmpi - starti);
-
-            if (Asizenow + tmpsize * 3 >= Asize) {
-                if (!fulltagA) {
-                    fulltagA = 1;
-                    fullA = tj;
-                }
-                // cache the csc size of each col block
-                // currsizeAc[tj] = tmpsize;
-            } else {
-                // currsizeAc[tj] = tmpsize;
-                preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                preA += memoryBandwidthWhole(tmpsize * 3 + 2);
-                AccessByte += tmpsize * 3 + 2;
-
-                // for each element need:
-                // 1) get pos: one read (current position)
-                // 2) add to chain: 1 data write; 1/block chain index write
-                preSramAccess += sramWriteBandwidth(tmpsize);
-                preSramAccess +=
-                    sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
-            }
-        }
-    }
-
-    // mismatch of OP (different)
-
-    if ((dataflow == Outer) && ((format == RC) || (format == RR))) {
-        // implicit transform while loading
-
-        // estimated fiberlet fragment waste
-        Asize += ((fiberletlength + 1) / 2) * jjj;
-
-        // on-chip fiber current
-
-        Asize += jjj;
-
-        // Initialize
-        for (int tj = TJ; tj < TJ + jjj; tj++) {
-            bufferedsizeA[tj] = 0;
-        }
-
-        for (int ti = TI; ti < TI + iii; ti++) {
-            if (ti > I)
-                break;
-
-            int startj = beginA[ti], tmpj = beginA[ti],
-                maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
-
-            while (tmpj < maxj) {
-                int tmpindex = A[ti][tmpj];
-                if (tmpindex >= TJ + jjj) {
-                    break;
-                }
-                tmpj++;
-
-                bufferedsizeA[tmpindex]++;
-            }
-
-            int tmpsize = (tmpj - startj);
-
-            if (Asizenow + tmpsize * 3 >= Asize) {
-                if (!fulltagA) {
-                    fulltagA = 1;
-                    fullA = ti;
-                }
-                // cache the csc size of each col block
-                // currsizeAc[tj] = tmpsize;
-            } else {
-                // currsizeAc[tj] = tmpsize;
-                preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                preA += memoryBandwidthWhole(tmpsize * 3 + 2);
-                AccessByte += tmpsize * 3 + 2;
-
-                // for each element need:
-                // 1) get pos: one read (current position)
-                // 2) add to chain: 1 data write; 1/block chain index write
-                preSramAccess += sramWriteBandwidth(tmpsize);
-                preSramAccess +=
-                    sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
-            }
-        }
-    }
 }
 
 void pre_load_B() {
@@ -887,7 +648,7 @@ void pre_load_B() {
             // int _TK;
 
             for (tj = TJ; tj < TJ + jjj; tj++) {
-                if (tj > J)
+                if (tj >= J)
                     break;
 
                 if ((tj - TJ) < (jjj / 2)) {
@@ -956,7 +717,7 @@ void pre_load_B() {
             }
 
             for (int tk = TK; tk < TK + kkk; tk++) {
-                if (tk > K)
+                if (tk >= K)
                     break;
 
                 int startj = beginBc[tk], tmpj = beginBc[tk],
@@ -1010,7 +771,7 @@ void pre_load_B() {
             // 这里preload就是为了确定dynamic的
             // for(tk = TK; tk < TK+((ISDYNAMICK)?dynk:kkk); tk ++){
             for (tk = TK; tk < TK + kkk; tk++) {
-                if (tk > K)
+                if (tk >= K)
                     break;
 
                 // on-chip fiber start
@@ -1060,7 +821,7 @@ void pre_load_B() {
             }
 
             for (int tj = TJ; tj < TJ + jjj; tj++) {
-                if (tj > J)
+                if (tj >= J)
                     break;
 
                 int startk = beginB[tj], tmpk = beginB[tj],
@@ -1103,78 +864,6 @@ void pre_load_B() {
     }
 
     // scenario 2: mismatch
-
-    // mismatch of the Gust and Inner have been considered in scenario 1
-    if (dataflow == Outer) {
-
-        Bsizenow = 0;
-        fulltagB = 0;
-        fullB = 0;
-
-        // match: don't need buffer
-        if ((format == RR) || (format == CR)) {
-            // don't need pre load
-            return;
-        }
-
-        // mismatch: buffered; same as Gust mismatch!
-        if ((format == RC) || (format == CC)) {
-            // inconsistent format
-            // implicit transform while loading
-
-            // estimated fiberlet fragment waste
-            Bsizenow += ((fiberletlength + 1) / 2) * jjj;
-
-            // on-chip fiber current
-            Bsizenow += jjj;
-
-            // Initialize
-            for (int tj = TJ; tj < TJ + jjj; tj++) {
-                bufferedsizeB[tj] = 0;
-            }
-
-            for (int tk = TK; tk < TK + kkk; tk++) {
-                if (tk > K)
-                    break;
-
-                int startj = beginBc[tk], tmpj = beginBc[tk],
-                    maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-                while (tmpj < maxj) {
-                    int tmpindex = Bc[tk][tmpj];
-                    if (tmpindex >= TJ + jjj) {
-                        break;
-                    }
-                    tmpj++;
-
-                    bufferedsizeB[tmpindex]++;
-                }
-
-                int tmpsize = (tmpj - startj);
-
-                if (Bsizenow + tmpsize * 3 >= Bsize) {
-                    if (!fulltagB) {
-                        fulltagB = 1;
-                        fullB = tk;
-                    }
-                    // cache the csc size of each col block
-                    //   currsizeBc[tk] = tmpsize;
-                } else {
-                    //   currsizeBc[tk] = tmpsize;
-                    preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    AccessByte += tmpsize * 3 + 2;
-
-                    // for each element need:
-                    // 1) get pos: one read (current position)
-                    // 2) add to chain: 1 data write; 1/block chain index write
-                    preSramAccess += sramWriteBandwidth(tmpsize);
-                    preSramAccess +=
-                        sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
-                }
-            }
-        }
-    }
 }
 
 /*
@@ -1319,130 +1008,62 @@ void get_B_fiber_col_iii(int kk, int iii) {
         AccessByte += (currsizeBc[kk] * 3 + 2) * iii;
     }
 }
-void get_B_fiber_col(int kk) {
-    if (consistent_B()) {
-        // B[jj] is on the buffer
-        if (fulltagB == 0 || kk < fullB) {
-            // hit!
-            // different access with B format:
-            // continuous or chained
-            computeSramAccess += sramReadBandwidth(currsizeBc[kk] * 3 + 2);
 
-        } else {
-            // B[jj] is not on the buffer, need to access dram
-            // different access with B format
-            // access one dram fiber all check all
+void get_A_fiber_col(int jj)
+{
+    assert(consistent_A());
 
-            computeDramAccess += memoryBandwidthPE(currsizeBc[kk] * 3 + 2);
-
-            computeB += memoryBandwidthPE(currsizeBc[kk] * 3 + 2);
-            AccessByte += currsizeBc[kk] * 3 + 2;
-        }
+    // A[ii] is on the buffer
+    if (fulltagA == 0 || jj < fullA) {
+        // hit
+        computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2);
     } else {
-        // hit part (chained)
-        computeSramAccess +=
-            sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[kk] + 3) / 4);
 
-        // miss part (need to check every uncached)
+        computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
+        computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
+        AccessByte += currsizeAc[jj] * 3 + 2;
 
-        if (fulltagB) {
-            computeDramAccess +=
-                (memoryBandwidthPE(3)) * ((long long)TJ + jjj - fullB);
-            computeB +=
-                (memoryBandwidthPE(3)) * (long long)((long long)TJ + jjj - fullB);
-            AccessByte += 3 * ((long long)TJ + jjj - fullB);
-        }
-    }
-}
+        computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
+                                sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
 
-void get_A_fiber_col(int jj) {
-
-    if (consistent_A()) {
-
-        // A[ii] is on the buffer
-        if (fulltagA == 0 || jj < fullA) {
-            // hit
-            computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2);
-        } else {
-
+        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+            // double A access in static FLRU scheme
             computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
             computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-            AccessByte += currsizeAc[jj] * 3 + 2;
 
             computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
-                                 sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
-
-            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                // double A access in static FLRU scheme
-                computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-                computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-
-                computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
-                                     sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
-            }
-        }
-    } else {
-
-        // hit part (chained)
-        computeSramAccess +=
-            sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeA[jj] + 3) / 4);
-
-        // miss part (need to check every uncached)
-
-        if (fulltagA) {
-            computeDramAccess +=
-                (memoryBandwidthPE(3)) * ((long long)TI + iii - fullA);
-            computeB +=
-                (memoryBandwidthPE(3)) * (long long)((long long)TI + iii - fullA);
-            AccessByte += 3 * ((long long)TI + iii - fullA);
+                                    sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
         }
     }
 }
 
 void get_A_fiber(int ii) {
+    assert(consistent_A());
 
-    if (consistent_A()) {
+    // A[ii] is on the buffer
+    if (fulltagA == 0 || ii < fullA) {
+        // hit
+        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
 
-        // A[ii] is on the buffer
-        if (fulltagA == 0 || ii < fullA) {
-            // hit
+        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+            // double A access in static FLRU scheme
             computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
-
-            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                // double A access in static FLRU scheme
-                computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
-            }
-        } else {
-            computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-            computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-            AccessByte += currsizeA[ii] * 3 + 2;
-
-            computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
-                                 sramWriteBandwidth(currsizeA[ii] * 3 + 2);
-
-            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                // double A access in static FLRU scheme
-                computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-                computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-
-                computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
-                                     sramWriteBandwidth(currsizeA[ii] * 3 + 2);
-            }
         }
     } else {
+        computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
+        computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
+        AccessByte += currsizeA[ii] * 3 + 2;
 
-        // hit part (chained)
-        computeSramAccess +=
-            sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeA[ii] + 3) / 4);
+        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
+                                sramWriteBandwidth(currsizeA[ii] * 3 + 2);
 
-        // miss part (need to check every uncached)
+        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+            // double A access in static FLRU scheme
+            computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
+            computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
 
-        if (fulltagA) {
-            computeDramAccess +=
-                (memoryBandwidthPE(3)) * ((long long)TJ + jjj - fullA);
-            computeA +=
-                (memoryBandwidthPE(3)) * (long long)((long long)TJ + jjj - fullA);
-            AccessByte += 3 * ((long long)TJ + jjj - fullA);
+            computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
+                                    sramWriteBandwidth(currsizeA[ii] * 3 + 2);
         }
     }
 }
@@ -1500,8 +1121,7 @@ void updateCAccess(int ii) {
             Csizenow = 0;
 
             for (int i = TI; i < TI + iii; i++) {
-                bufferedC[i].clear();
-                bufferedC[i] = std::set<int>();
+                bufferedC[i]    = std::set<int>();
                 bufferedClen[i] = 0;
             }
         }
@@ -1644,6 +1264,7 @@ bool prefetchrow(int ii) {
         needsize = currsizeA[ii] * 4 + 1;
     }
     // FLFU mode; don't need next pointer (*3)
+    // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
     else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
         needsize = currsizeA[ii] * 3;
     }
@@ -1658,6 +1279,17 @@ bool prefetchrow(int ii) {
     int tmpj = beginA[ii];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
+    // QUESTION(ejs): Observation: if column c in the current A row fiber is non-zero,
+    // it will multiply against row c of B. Hence, for each non-zero A col we know
+    // we will eventually need the corresponding B row.
+    //
+    // This loop iterates over *all* columns of the current A row fiber to compute the
+    // perfect cache metadata (LFU counts) of the corresponding B rows which shall be needed.
+    // However, this is problematic:
+    // - summing the lfu counts *per cycle* across the entire fiber does not seem remotely feasible
+    // - how can they POSSIBLY guarantee that all the needed A columns are in cache? This is
+    // essentially oracle access/cheating
+    // - they are not charging for these accesses into metadata (e.g. increment computeSramAccess or something)
     while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
         // coordinate of required B fiber
         // in this prefetch: push the next access queue of jj a ii
@@ -1682,7 +1314,7 @@ bool prefetchrow(int ii) {
                 int _set = getSet2(tmpaddr);
                 int _tag = getTag2(tmpaddr);
 
-                bool needhalf = 0;
+                bool need_halve_lfu = 0;
                 bool incache = 0;
 
                 prefetch_increments++;
@@ -1706,7 +1338,9 @@ bool prefetchrow(int ii) {
                         lfubit[_set * SETASSOC + i]++;
                         // if the updated flfu bit overflow
                         if (lfubit[_set * SETASSOC + i] > LFUmax) {
-                            needhalf = 1;
+                            // NOTE(ejs): when one lfu counter saturates, the entire array of lfu's
+                            // will be halved (renormalized) so the counts remain meaningful.
+                            need_halve_lfu = 1;
                         }
                         break;
                     }
@@ -1723,7 +1357,7 @@ bool prefetchrow(int ii) {
                                     invirtualtag = 1;
                                     virtuallfubit[_set * VIRTUALSETASSOC + i]++;
                                     if (virtuallfubit[_set * VIRTUALSETASSOC + i] > LFUmax) {
-                                        needhalf = 1;
+                                        need_halve_lfu = 1;
                                     }
                                     // if find a matched, don't need to check others
                                     break;
@@ -1771,7 +1405,7 @@ bool prefetchrow(int ii) {
 
                 // if the updated flfu overlow, half the flfubit of the whole set!
                 // both update in cache or virtual tag will cause the half
-                if (needhalf) {
+                if (need_halve_lfu) {
                     for (int i = 0; i < SETASSOC; i++) {
                         if (Valid[_set * SETASSOC + i]) {
                             lfubit[_set * SETASSOC + i] /= 2;
@@ -1804,7 +1438,7 @@ bool prefetchrow(int ii) {
 
 // void initialize_adaptive_prefetch(long long nnzA, long long nnzB, int K, int J,
 //                                   int T_J) {
-void initialize_adaptive_prefetch(long long, long long, int, int, int) {
+void initialize_adaptive_prefetch() {
     // --- Offline Phase ---
     // double avg_nonzero_length_B;
     // if (K > 0 && T_J > 0) {
@@ -1850,10 +1484,6 @@ int get_num_samples(double current_temperature) {
 
 bool lastaccept = 1;
 
-double SA_FINAL_TEMP = 0.000001;
-
-bool SAstage = 0;
-
 void update_prefetch_size() {
     double temperature = SA_INITIAL_TEMP * pow(SA_COOLING_RATE, sa_iteration_k);
 
@@ -1895,7 +1525,6 @@ void update_prefetch_size() {
                 if (current_data_miss_rate >= 0.3 &&
                     current_discard_rate > RATE_THRESHOLD) {
 
-                    SAstage = 1;
                     double perturbation =
                         ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 0.2;
                     current_prefetch_size *= (1.0 + perturbation);
@@ -1993,7 +1622,6 @@ void update_prefetch_size() {
             if (current_data_miss_rate >= 0.3 &&
                 current_discard_rate > RATE_THRESHOLD) {
 
-                SAstage = 1;
                 double perturbation =
                     ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 1.0;
                 current_prefetch_size *= (1.0 + perturbation);
@@ -2035,188 +1663,140 @@ void calculate() {
 
     computePE = computeDramAccess = computeSramAccess = 0;
 
-    if ((dataflow == Inner) || (dataflow == Gust)) {
+    switch (dataflow) {
+    case Gust: {
 
-        if (dataflow == Gust) {
+        prefetchNow = 0;
 
-            prefetchNow = 0;
-
-            // all prefetch scheme
-            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-                cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
-                // reinitialize the next pointer for FLRU
-                if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
-                    cacheScheme == CACHE_SCHEME_SPARCH) {
-                    for (int j1 = TJ; j1 < TJ + jjj; j1++) {
-                        if (j1 > J)
-                            break;
-                        while (!nextposvector[j1].empty()) {
-                            nextposvector[j1].pop();
-                        }
-                    }
-                }
-                // reinitialize the LFU tag for FLFU
-                if (cacheScheme == 66) {
-                    for (int j1 = TJ; j1 < TJ + jjj; j1++) {
-                        LFUtag[j1] = 0;
-                    }
-                }
-
-                // first prefill the prefetch window
-                for (int ii = 0; prefetchNow < prefetchSize && ii < iii; ii++) {
-                    if (TI + ii > I)
+        // all prefetch scheme
+        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
+            cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
+            // reinitialize the next pointer for FLRU
+            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
+                cacheScheme == CACHE_SCHEME_SPARCH) {
+                for (int j1 = TJ; j1 < TJ + jjj; j1++) {
+                    if (j1 > J)
                         break;
-
-                    prefetchRowNow = TI + ii;
-                    // return 0 if can't prefetch that row now
-                    if (!prefetchrow(TI + ii)) {
-                        break;
+                    while (!nextposvector[j1].empty()) {
+                        nextposvector[j1].pop();
                     }
                 }
             }
+            // reinitialize the LFU tag for FLFU
+            if (cacheScheme == 66) {
+                // QUESTION(ejs): Note that len(LFUtag) = J (i.e. num cols in A / num rows in B).
+                // Why the hell is the LFUtag array being cleared to 0 every iteration?
+                // How can this be tracking the corresponding B row frequency accurately?
+                for (int j1 = TJ; j1 < TJ + jjj; j1++) {
+                    LFUtag[j1] = 0;
+                }
+            }
 
-            for (int ii = 0; ii < iii; ii++) {
+            // first prefill the prefetch window
+            for (int ii = 0; prefetchNow < prefetchSize && ii < iii; ii++) {
                 if (TI + ii > I)
                     break;
 
-                // get O(J) corresponding B (different from Gust and Inner)
-                // different from other dataflow (is A-dependent)
-                get_B_fibers(TI + ii);
-
-                // update the prefetch window after each row
-                // don't need to update prefetch window in static flru
-                if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-                    cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
-
-                    // first minus this row's overhead
-                    int needsize = 0;
-                    if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_SPARCH) {
-                        needsize = currsizeA[TI + ii] * 4 + 1;
-                    }
-                    // FLFU mode; don't need next pointer (*3)
-                    if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
-                        needsize = currsizeA[TI + ii] * 3;
-                    }
-
-                    if (prefetchNow > needsize) {
-                        prefetchNow -= needsize;
-                    }
-
-                    // need to prefetch the next ii+prefetchsize+1
-                    if (prefetchNow >= prefetchSize)
-                        continue;
-
-                    while (prefetchRowNow < TI + iii) {
-                        if (!prefetchrow(prefetchRowNow)) {
-                            break;
-                        }
-                        prefetchRowNow++;
-                    }
-                }
-
-                if (adaptive_prefetch) {
-                    if (elements_processed_since_last_adjustment >= adjustment_interval) {
-                        update_prefetch_size();
-                        elements_processed_since_last_adjustment = 0;
-                    }
+                prefetchRowNow = TI + ii;
+                // return 0 if can't prefetch that row now
+                if (!prefetchrow(TI + ii)) {
+                    break;
                 }
             }
         }
 
-        if (dataflow == Inner) {
+        for (int ii = 0; ii < iii; ii++) {
+            if (TI + ii > I)
+                break;
 
-            // update B here
-            for (int k = TK; k < TK + kkk; k++) {
-                get_B_fiber_col_iii(k, iii);
-            }
+            // get O(J) corresponding B (different from Gust and Inner)
+            // different from other dataflow (is A-dependent)
+            get_B_fibers(TI + ii);
 
-            for (int ii = 0; ii < iii; ii++) {
+            // update the prefetch window after each row
+            // don't need to update prefetch window in static flru
+            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
+                cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
 
-                // int cnew = 0;
-                int cnow = 0;
-
-                // update A
-                // get A
-                get_A_fiber(TI + ii);
-
-                // update C
-
-                int tmpj = beginA[TI + ii];
-                int maxj = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
-
-                // tmpc = 0
-                for (int k1 = TK; k1 < TK + kkk; k1++) {
-                    tmpC[k1] = 0;
+                // first minus this row's overhead
+                int needsize = 0;
+                if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_SPARCH) {
+                    needsize = currsizeA[TI + ii] * 4 + 1;
+                }
+                // FLFU mode; don't need next pointer (*3)
+                if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
+                    needsize = currsizeA[TI + ii] * 3;
                 }
 
-                while (tmpj < maxj && A[TI + ii][tmpj] < TJ + jjj) {
-                    // coordinate of required B fiber
-                    int jj = A[TI + ii][tmpj];
+                if (prefetchNow > needsize) {
+                    prefetchNow -= needsize;
+                }
 
-                    update_c_fiber(jj);
+                // need to prefetch the next ii+prefetchsize+1
+                if (prefetchNow >= prefetchSize)
+                    continue;
 
-                    tmpj++;
-
-                    if (offsetarrayA[TI + ii] + tmpj >= offsetarrayA[TI + ii + 1]) {
+                // QUESTION(ejs): Why are we updating prefetchRowNow / calling prefetchrow again?
+                while (prefetchRowNow < TI + iii) {
+                    if (!prefetchrow(prefetchRowNow)) {
                         break;
                     }
+                    prefetchRowNow++;
                 }
+            }
 
-                updateCAccess(TI + ii);
-
-                continue;
-
-                for (int kk = 0; kk < kkk; kk++) {
-                    // get B
-                    get_B_fiber_col(TK + kk);
-
-                    // calculate if there is an intersect between A & B
-                    int tmpja = beginA[TI + ii],
-                        maxja = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
-                    int tmpjb = beginBc[TK + kk],
-                        maxjb = offsetarrayBc[TK + kk + 1] - offsetarrayBc[TK + kk];
-
-                    bool findflag = 0;
-
-                    while (tmpja < maxja && A[TI + ii][tmpja] < TJ + jjj) {
-
-                        int findj = A[TI + ii][tmpja];
-
-                        while (tmpjb < maxjb && Bc[TK + kk][tmpjb] < TJ + jjj) {
-
-                            if (Bc[TK + kk][tmpjb] >= findj) {
-                                break;
-                            }
-                            tmpjb++;
-                        }
-
-                        // need to assure that b exit first!!
-                        // find the same index!
-                        if (tmpjb < maxjb && Bc[TK + kk][tmpjb] == findj) {
-                            findflag = 1;
-                            break;
-                        }
-
-                        tmpja++;
-                    }
-
-                    // get a C[TI+ii][TK+kk]
-                    if (findflag) {
-                        // if is the new index all update the old index
-                        cnow++;
-
-                    } else {
-                        // zero C; don't need extra operation
-                    }
+            if (adaptive_prefetch) {
+                if (elements_processed_since_last_adjustment >= adjustment_interval) {
+                    update_prefetch_size();
+                    elements_processed_since_last_adjustment = 0;
                 }
-
-                computeDramAccess += memoryBandwidthPE(cnow * 3);
-                computeC += memoryBandwidthPE(cnow * 3);
-                AccessByte += cnow * 3;
             }
         }
     }
-    if (dataflow == Outer) {
+        break;
+
+    case Inner: {
+
+        // update B here
+        for (int k = TK; k < TK + kkk; k++) {
+            get_B_fiber_col_iii(k, iii);
+        }
+
+        for (int ii = 0; ii < iii; ii++) {
+
+            // update A
+            // get A
+            get_A_fiber(TI + ii);
+
+            // update C
+
+            int tmpj = beginA[TI + ii];
+            int maxj = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
+
+            // tmpc = 0
+            for (int k1 = TK; k1 < TK + kkk; k1++) {
+                tmpC[k1] = 0;
+            }
+
+            while (tmpj < maxj && A[TI + ii][tmpj] < TJ + jjj) {
+                // coordinate of required B fiber
+                int jj = A[TI + ii][tmpj];
+
+                update_c_fiber(jj);
+
+                tmpj++;
+
+                if (offsetarrayA[TI + ii] + tmpj >= offsetarrayA[TI + ii + 1]) {
+                    break;
+                }
+            }
+
+            updateCAccess(TI + ii);
+        }
+    }
+        break;
+
+    case Outer: {
 
         for (int jj = 0; jj < jjj; jj++) {
             get_A_fiber_col(TJ + jj);
@@ -2276,6 +1856,8 @@ void calculate() {
             }
         }
     }
+        break;
+    }
 
     totalCycle += max(computePE / PEcnt, max(computeDramAccess / PEcnt,
                                              computeSramAccess / sramBank));
@@ -2287,39 +1869,10 @@ void calculate() {
     totalPE += computePE / PEcnt;
 }
 
-void post_calculate_store() {
-
-    if (checkReuseC()) {
-        return;
-    }
-}
-
-int minBlock = 2000;
-
-int getkbound() {
-    return minBlock;
-    return max(23, min(minBlock, K / minBlock));
-}
-
-int getjbound() {
-    return minBlock;
-    return max(23, min(minBlock, J / minBlock));
-}
-
-int getibound() {
-    return minBlock;
-    return max(23, min(minBlock, I / minBlock));
-}
-
 void configPartial(float partialA, float partialB, float partialC) {
-
     Asize = cachesize * partialA;
     Bsize = cachesize * partialB;
     Csize = cachesize * partialC;
-
-    // no C reuse -> only A/B
-    if ((interorder != JIK) && (interorder != JKI)) {
-    }
 }
 
 void initialize_simulator() {
@@ -2349,13 +1902,9 @@ void initialize_simulator() {
             currsizeB = new int[J]();
         if (currsizeBc == nullptr)
             currsizeBc = new int[J]();
-        // if(currsizeC == nullptr) new int[K];
 
-        if (bufferedsizeA == nullptr)
-            bufferedsizeA = new int[I]();
         if (bufferedsizeB == nullptr)
             bufferedsizeB = new int[J]();
-        // if(bufferedsizeC == nullptr) new int[K];
 
         if (tmpC == nullptr)
             tmpC = new int[K]();
@@ -2395,13 +1944,9 @@ void deinitialize_simulator() {
         delete[] currsizeB;
     if (currsizeBc != nullptr)
         delete[] currsizeBc;
-    // if(currsizeC != nullptr) delete[] currsizeC;
 
-    if (bufferedsizeA != nullptr)
-        delete[] bufferedsizeA;
     if (bufferedsizeB != nullptr)
         delete[] bufferedsizeB;
-    // if(bufferedsizeC != nullptr) delete[] bufferedsizeC;
 
     if (tmpC != nullptr)
         delete[] tmpC;
@@ -2439,8 +1984,7 @@ void reinitialize() {
     // reinitialize buffer c
     Csizenow = 0;
     for (int i = 0; i < I; i++) {
-        bufferedC[i].clear();
-        bufferedC[i] = std::set<int>();
+        bufferedC[i]    = std::set<int>();
         bufferedClen[i] = 0;
     }
 
@@ -2535,7 +2079,7 @@ void run() {
     reinitialize();
 
     if (adaptive_prefetch) {
-        initialize_adaptive_prefetch(nzA, nzB, K, J, jjj);
+        initialize_adaptive_prefetch();
     }
 
     if (iii > I)
@@ -2576,8 +2120,6 @@ void run() {
 
                 calculate();
 
-                post_calculate_store();
-
                 // adddyn
                 // dynamically update the estimate tile here.
                 // don't change the actual TI/TJ/TK(iii, jjj, kkk in the code) here,
@@ -2601,7 +2143,7 @@ void run() {
     analyze_statistics();
 }
 
-void runTile(int /* iii */, int jjj, int kkk, long long tti, long long ttj, long long ttk, long long SmallestTile) {
+void runTile(int /* iii */, int jjj, int kkk, long long tti, long long ttj, long long ttk) {
     assert(ISCACHE);
 
     // deal with the opt metadata

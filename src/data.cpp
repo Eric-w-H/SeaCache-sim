@@ -16,7 +16,7 @@ std::vector<int>
     *Ac = nullptr, // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
         *B = nullptr, *Bc = nullptr;
 
-std::vector<int> *sparchA = nullptr, *sparchAi = nullptr;
+std::vector<int> *sparchA = nullptr;
 
 int *offsetarrayA = nullptr, *offsetarrayAc = nullptr;
 int *offsetarrayB = nullptr, *offsetarrayBc = nullptr;

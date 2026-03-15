@@ -13,7 +13,7 @@ extern int N, M, nzA, nzB;
 
 // sparse matrices A, B and their transposes Ac, Bc
 extern std::vector<int> *A, *Ac;
-extern std::vector<int> *sparchA, *sparchAi;
+extern std::vector<int> *sparchA;
 extern std::vector<int> *B, *Bc;
 
 // store the offsets for A, Ac, B, Bc

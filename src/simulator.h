@@ -5,19 +5,12 @@ extern int cachesize;
 extern int prefetchSize;
 extern bool adaptive_prefetch;
 
-extern int minBlock;
-
 extern int cacheScheme;
 
 void configPartial(float partialA, float partialB, float partialC);
 void reinitialize();
-void runTile(int iii, int jjj, int kkk, long long tti,
-             long long ttj, long long ttk, long long SmallestTile);
+void runTile(int iii, int jjj, int kkk, long long tti, long long ttj, long long ttk);
 void run();
-
-int getkbound();
-int getjbound();
-int getibound();
 
 extern int *currsizeB;
 extern int *currsizeBc;

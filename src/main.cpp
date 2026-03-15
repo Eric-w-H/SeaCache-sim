@@ -51,7 +51,6 @@ int main(int argc, char *argv[]) {
     dataflow = Gust;
     format = RR;
     int transpose = config["transpose"].get<int>();
-    minBlock = 2;
     float tmpsram = config["cachesize"].get<float>();
     cachesize = tmpsram * 262144 * 0.9;
     inputcachesize = cachesize;
@@ -141,7 +140,7 @@ int main(int argc, char *argv[]) {
         }
 
         int xx, yy;
-        double zz, lala;
+        // double zz, lala;
 
         /* NOTE(ejs): Each mtx row is a matrix entry.
         xx, yy [zz, lala]
@@ -159,13 +158,13 @@ int main(int argc, char *argv[]) {
 
             std::istringstream(tokens[0]) >> xx;
             std::istringstream(tokens[1]) >> yy;
-            std::istringstream(tokens[2]) >> zz;
+            // std::istringstream(tokens[2]) >> zz;
             // std::cout << "values: " << xx << ", " << yy << ", " << zz << std::endl;
         } else if (tokens.size() == 4) { // complex matrix (we only take the real part, unfortunately)
             std::istringstream(tokens[0]) >> xx;
             std::istringstream(tokens[1]) >> yy;
-            std::istringstream(tokens[2]) >> zz;
-            std::istringstream(tokens[3]) >> lala;
+            // std::istringstream(tokens[2]) >> zz;
+            // std::istringstream(tokens[3]) >> lala;
             // std::cout << "values: " << xx << ", " << yy << ", " << zz << std::endl;
         } else {
 
@@ -194,15 +193,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (condensedOP) {
-        // memory management for sparchA, sparchAi
+        // memory management for sparchA
         sparchA = new std::vector<int>[J]();
-        sparchAi = new std::vector<int>[J]();
-        if (sparchA == nullptr || sparchAi == nullptr) {
+        if (sparchA == nullptr) {
             if (sparchA != nullptr)
                 delete[] sparchA;
-            if (sparchAi != nullptr)
-                delete[] sparchAi;
-            std::cerr << "Error allocating memory for sparchA or sparchAi" << std::endl;
+            std::cerr << "Error allocating memory for sparchA" << std::endl;
             std::exit(1);
         }
 
@@ -213,7 +209,6 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < I; i++) {
                 if (static_cast<int>(A[i].size()) > j) {
                     sparchA[j].push_back(A[i][j]);
-                    sparchAi[j].push_back(i);
                 }
             }
         }
@@ -226,7 +221,6 @@ int main(int argc, char *argv[]) {
         }
 
         delete[] sparchA;
-        delete[] sparchAi;
     }
 
     long long totalempty = 0;
@@ -376,13 +370,7 @@ int main(int argc, char *argv[]) {
     }
 
     for (int j = 1; j < J; j++) {
-        int tmplen = B[j - 1].size();
-        offsetarrayB[j] = offsetarrayB[j - 1] + tmplen;
-
-        // the actual access size
-        tmplen = tmplen * 3; // NOTE(ejs): wtf is this 3 supposed to mean?
-
-        // int freqj = (offsetarrayAc[j + 1] - offsetarrayAc[j]);
+        offsetarrayB[j] = offsetarrayB[j - 1] + B[j - 1].size();
     }
     // two problem:
     // 1) this calculate way just calculate the minimum
@@ -414,30 +402,6 @@ int main(int argc, char *argv[]) {
     getParameter();
 
     configPartial(0.05, 0.5, 0.45);
-    // also calculate the pbound here as the bound of tile search
-    int pbound = K;
-    int leftbound = 0; // (leftbound, k] is the current window
-    int sumnow = 0;
-
-    int Bbound = Bsize;
-
-    for (int k = 0; k < K; k++) {
-        sumnow += Bc[k].size() * 3 + 1;
-
-        while (sumnow > Bbound && leftbound < k) {
-            pbound = min(pbound, k - leftbound);
-            leftbound++;
-            sumnow -= Bc[leftbound].size() * 3 + 1;
-        }
-    }
-
-    // long long SmallestTile = ((long long)pbound) * J;
-
-    // int kbound = getkbound();
-    // int jbound = getjbound();
-    // int ibound = getibound();
-
-    int usesearchedtile = 1;
 
     int t_i, t_j, t_k;
 
@@ -475,7 +439,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         adaptive_prefetch = 0;
         useVirtualTag = 0;
@@ -492,7 +456,7 @@ int main(int argc, char *argv[]) {
         CACHEBLOCK = 16;
         CACHEBLOCKLOG = 4;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         fflush(stdout);
 
@@ -521,7 +485,7 @@ int main(int argc, char *argv[]) {
             newttk = (K + kkk - 1) / kkk;
             cachesize -= kkk * 2;
         }
-        runTile(iii, jjj, newkkk, tti, newttk, ttj, 0);
+        runTile(iii, jjj, newkkk, tti, newttk, ttj);
         // return to the default setting
         CACHEBLOCK = 16;
         CACHEBLOCKLOG = 4;
@@ -541,7 +505,7 @@ int main(int argc, char *argv[]) {
         CACHEBLOCK = 4;
         CACHEBLOCKLOG = 2;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         // return to the default setting
         CACHEBLOCK = 16;
@@ -569,7 +533,7 @@ int main(int argc, char *argv[]) {
         cacheScheme;
         cachesize = inputcachesize;
 
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
         adaptive_prefetch = 0;
         useVirtualTag = 0;
         *****************************************/
@@ -589,7 +553,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -599,7 +563,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_MAPPING;
         cachesize = inputcachesize;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -608,7 +572,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 6;
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 with virtue   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -618,7 +582,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 6;
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
         useVirtualTag = 0;
 
         puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
@@ -626,7 +590,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 16;
-        runTile(iii, jjj, kkk, tti, ttk, ttj, 0);
+        runTile(iii, jjj, kkk, tti, ttk, ttj);
         useVirtualTag = 0;
     }
 
