@@ -7,10 +7,10 @@
 #include "headers.h"
 
 
-std::vector<u64> *A   = nullptr;  // A[r]  = [c_1, c_2, ..., c_u] are non-zero column indices in row r
-std::vector<u64> *Ac  = nullptr; // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
-std::vector<u64> *B   = nullptr;
-std::vector<u64> *Bc  = nullptr;
+u64 **A   = NULL;  // A[r]  = [c_1, c_2, ..., c_u] are non-zero column indices in row r
+u64 **Ac  = NULL; // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
+u64 **B   = NULL;
+u64 **Bc  = NULL;
 
 std::vector<int> *sparchA   = nullptr;
 

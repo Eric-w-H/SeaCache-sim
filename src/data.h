@@ -10,9 +10,9 @@
 static const int MAXN = 3000000;
 
 // sparse matrices A, B and their transposes Ac, Bc
-extern std::vector<u64> *A, *Ac;
+extern u64 **A, **Ac;
+extern u64 **B, **Bc;
 extern std::vector<int> *sparchA;
-extern std::vector<u64> *B, *Bc;
 
 // store the offsets for A, Ac, B, Bc
 extern u64 *offsetarrayA, *offsetarrayAc;

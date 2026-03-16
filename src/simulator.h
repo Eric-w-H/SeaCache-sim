@@ -24,6 +24,7 @@ struct simulator_state {
 
 
 extern struct Arena *global_persist;
+extern struct Arena *global_temp;
 extern struct simulator_state sim;
 
 extern int cachesize;

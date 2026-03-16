@@ -50,10 +50,10 @@ void getParameter()
     estnnzC = 0;
 
     for (int i = 0; i < sim.cfg.I; i++)
-        endA[i] = A[i].size();
+        endA[i] = offsetarrayA[i+1] - offsetarrayA[i];
 
     for (int j = 0; j < sim.cfg.J; j++)
-        endB[j] = B[j].size();
+        endB[j] = offsetarrayB[j+1] - offsetarrayB[j];
 
     for (int i = 0; i < sim.cfg.I; i++) {
         int lenA = endA[i];

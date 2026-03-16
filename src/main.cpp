@@ -9,6 +9,7 @@
 #include <fstream>
 
 struct Arena *global_persist;
+struct Arena *global_temp;
 struct simulator_state sim;
 
 using json = nlohmann::json;
@@ -24,9 +25,8 @@ struct matrix {
     u64 *M_backing;
     u64 *Mc_backing;
 
-    std::vector<u64>
-        *M,
-        *Mc; 
+    u64 **M,
+        **Mc;
     u64
         *offsetarrayM,
         *offsetarrayMc;
@@ -46,6 +46,8 @@ i32 compare_kv(const void *p, const void *q)
 
 void parse_matrix(FILE *f, struct matrix *x)
 {
+    struct Arena_Mark mark = arena_snap(global_temp);
+
     i16 transpose = x->transpose;
 
     // Lines limited to 1024 characters by spec
@@ -56,31 +58,19 @@ void parse_matrix(FILE *f, struct matrix *x)
     // u64 total_nbytes    = sizeof(u64)*x->nzM;
     u64 *raw_rows, *raw_cols, *flat_indices;
     struct kv *kvs;
-    raw_rows    = (u64 *)arena_push(global_persist, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
-    raw_cols    = (u64 *)arena_push(global_persist, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
-    flat_indices= (u64 *)arena_push(global_persist, x->nzM*sizeof(*flat_indices), __alignof__(*flat_indices), 0);
-    kvs         = (struct kv *)arena_push(global_persist, x->nzM*sizeof(kvs[0]), __alignof__(kvs[0]), 0);
+    raw_rows        = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
+    raw_cols        = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
+    flat_indices    = (u64 *)arena_push(global_temp, x->nzM*sizeof(*flat_indices), __alignof__(*flat_indices), 0);
+    kvs             = (struct kv *)arena_push(global_temp, x->nzM*sizeof(*kvs), __alignof__(*kvs), 0);
+    u64 *row_lens   = (u64 *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
+    u64 *col_lens   = (u64 *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
 
     x->M_backing    = (u64 *)arena_push(global_persist, x->nzM*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
     x->Mc_backing   = (u64 *)arena_push(global_persist, x->nzM*sizeof(*x->Mc_backing), __alignof__(*x->Mc_backing), 0);
-    // x->offsetarrayM = (u64 *)arena_push(global_persist, x->nrows*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
-    // x->offsetarrayMc= (u64 *)arena_push(global_persist, x->ncols*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
-    u64 *row_lens   = (u64 *)arena_push(global_persist, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
-    u64 *col_lens   = (u64 *)arena_push(global_persist, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
-
-    try {
-        if (x->M == nullptr)
-            x->M = new std::vector<u64>[x->nrows]();
-        if (x->Mc == nullptr)
-            x->Mc = new std::vector<u64>[x->ncols]();
-        if (x->offsetarrayM == nullptr)
-            x->offsetarrayM = new u64[x->nrows]();
-        if (x->offsetarrayMc == nullptr)
-            x->offsetarrayMc = new u64[x->ncols]();
-    } catch (const std::bad_alloc &e) {
-        std::cerr << "Error allocating memory for " << e.what() << std::endl;
-        std::exit(1);
-    }
+    x->M            = (u64 **)arena_push(global_persist, (x->nrows+1)*sizeof(*x->M), __alignof__(*x->M), 0);
+    x->Mc           = (u64 **)arena_push(global_persist, (x->ncols+1)*sizeof(*x->Mc), __alignof__(*x->Mc), 0);
+    x->offsetarrayM = (u64 *)arena_push(global_persist, (x->nrows+1)*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
+    x->offsetarrayMc= (u64 *)arena_push(global_persist, (x->ncols+1)*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
 
     std::string input;
 
@@ -133,31 +123,13 @@ void parse_matrix(FILE *f, struct matrix *x)
             return;
         }
 
+        // WARNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
         u64 row_index = xx-1;
         u64 col_index = yy-1;
         if (transpose)
             swap(row_index, col_index);
         raw_rows[i] = row_index;
         raw_cols[i] = col_index;
-
-        // WMRNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
-        if (transpose) {
-            x->Mc[xx - 1].push_back(yy - 1);
-            x->M[yy - 1].push_back(xx - 1);
-
-            // x->M_backing[col_major_flat_index]  = row_index; 
-            // x->Mc_backing[row_major_flat_index] = col_index;
-            // ++row_lens[col_index];
-            // ++col_lens[row_index];
-        } else {
-            x->M[xx - 1].push_back(yy - 1);
-            x->Mc[yy - 1].push_back(xx - 1);
-
-            // x->M_backing[row_major_flat_index]  = col_index;
-            // x->Mc_backing[col_major_flat_index] = row_index;
-            // ++row_lens[row_index];
-            // ++col_lens[col_index];
-        }
     }
 
     {
@@ -168,9 +140,7 @@ void parse_matrix(FILE *f, struct matrix *x)
                 .val = i
             };
         }
-
         qsort(kvs, x->nzM, sizeof(*kvs), compare_kv);
-
         for (u64 i = 0; i < x->nzM; ++i) {
             u64 rdi = kvs[i].val;
             u64 row = raw_rows[rdi];
@@ -187,9 +157,7 @@ void parse_matrix(FILE *f, struct matrix *x)
                 .val = i
             };
         }
-
         qsort(kvs, x->nzM, sizeof(*kvs), compare_kv);
-
         for (u64 i = 0; i < x->nzM; ++i) {
             u64 rdi = kvs[i].val;
             u64 row = raw_rows[rdi];
@@ -200,18 +168,21 @@ void parse_matrix(FILE *f, struct matrix *x)
         }
     }
 
-    for (u64 i = 0; i < x->nrows; ++i)
-        x->offsetarrayM[i]  = x->offsetarrayM[i-1] + row_lens[i-1];
-    for (u64 i = 0; i < x->ncols; ++i)
-        x->offsetarrayMc[i] = x->offsetarrayMc[i-1]+ col_lens[i-1];
-
-    for (int i = 0; i < x->nrows; i++) {
-        sort(x->M[i].begin(), x->M[i].end());
+    x->offsetarrayM[0] = 0;
+    for (u64 i = 0; i < x->nrows; ++i) {
+        x->M[i]                 = x->M_backing + x->offsetarrayM[i];
+        x->offsetarrayM[i+1]    = x->offsetarrayM[i] + row_lens[i];
     }
-    for (int j = 0; j < x->ncols; j++) {
-        sort(x->Mc[j].begin(), x->Mc[j].end());
-    }
+    x->M[x->nrows] = x->M_backing + x->offsetarrayM[x->nrows];
 
+    x->offsetarrayMc[0] = 0;
+    for (u64 i = 0; i < x->ncols; ++i) {
+        x->Mc[i]                = x->Mc_backing + x->offsetarrayMc[i];
+        x->offsetarrayMc[i+1]   = x->offsetarrayMc[i] + col_lens[i];
+    }
+    x->Mc[x->ncols] = x->Mc_backing + x->offsetarrayMc[x->ncols];
+
+    arena_rewind(mark);
 }
 
 int main(int argc, char *argv[])
@@ -223,7 +194,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    global_persist = arena_alloc(16*GB, MB);
+    global_persist  = arena_alloc(16*GB, MB);
+    global_temp     = arena_alloc(16*GB, MB);
 
     std::string matrix1_name    = argv[1];
     std::string matrix2_name    = argv[2];
@@ -344,34 +316,34 @@ int main(int argc, char *argv[])
     if (condensedOP) {
         assert(0); // this path is not maintained
 
-        // memory management for sparchA
-        sparchA = new std::vector<int>[sim.cfg.J]();
-        if (sparchA == nullptr) {
-            if (sparchA != nullptr)
-                delete[] sparchA;
-            std::cerr << "Error allocating memory for sparchA" << std::endl;
-            std::exit(1);
-        }
+        // // memory management for sparchA
+        // sparchA = new std::vector<int>[sim.cfg.J]();
+        // if (sparchA == nullptr) {
+        //     if (sparchA != nullptr)
+        //         delete[] sparchA;
+        //     std::cerr << "Error allocating memory for sparchA" << std::endl;
+        //     std::exit(1);
+        // }
 
-        // if use the condensed OP dataflow, need to preprocess the A matrix into
-        // the condensed format first. first put the data into sparchA[], then put
-        // it back to A[], and call gust dataflow
-        for (int j = 0; j < sim.cfg.J; j++) {
-            for (int i = 0; i < sim.cfg.I; i++) {
-                if (static_cast<int>(A[i].size()) > j) {
-                    sparchA[j].push_back(A[i][j]);
-                }
-            }
-        }
+        // // if use the condensed OP dataflow, need to preprocess the A matrix into
+        // // the condensed format first. first put the data into sparchA[], then put
+        // // it back to A[], and call gust dataflow
+        // for (int j = 0; j < sim.cfg.J; j++) {
+        //     for (int i = 0; i < sim.cfg.I; i++) {
+        //         if (static_cast<int>(A[i].size()) > j) {
+        //             sparchA[j].push_back(A[i][j]);
+        //         }
+        //     }
+        // }
 
-        for (int j = 0; j < sim.cfg.J; j++) {
-            A[j].clear();
-            for (int i = 0; i < static_cast<int>(sparchA[j].size()); i++) {
-                A[j].push_back(sparchA[j][i]);
-            }
-        }
+        // for (int j = 0; j < sim.cfg.J; j++) {
+        //     A[j].clear();
+        //     for (int i = 0; i < static_cast<int>(sparchA[j].size()); i++) {
+        //         A[j].push_back(sparchA[j][i]);
+        //     }
+        // }
 
-        delete[] sparchA;
+        // delete[] sparchA;
     }
 
     long long totalempty = 0;
@@ -382,12 +354,13 @@ int main(int argc, char *argv[])
     long long totaltagmatch16 = 0;
 
     for (int i = 1; i < sim.cfg.I; i++) {
-        if (A[i - 1].size() < 48) {
-            totalempty += (48 - A[i - 1].size());
+        u64 size_im1 = offsetarrayA[i] - offsetarrayA[i-1];
+        if (size_im1 < 48) {
+            totalempty += (48 - size_im1);
         }
-        totalincache += min(48, (int)A[i - 1].size());
-        totaltagmatch48 += ((int)A[i - 1].size() + 47) / 48;
-        totaltagmatch16 += ((int)A[i - 1].size() + 15) / 16;
+        totalincache    += min(48, size_im1);
+        totaltagmatch48 += div_rup(size_im1, 48);
+        totaltagmatch16 += div_rup(size_im1, 16);
     }
 
     /////////////////////////// input B /////////////////////////////////
