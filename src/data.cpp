@@ -43,8 +43,8 @@ void initialize_data_A() {
     if(Ac == nullptr) Ac = new std::vector<int>[J]();
     if(SA == nullptr) SA = new std::vector<int>[I]();
     if(SAc == nullptr) SAc = new std::vector<int>[J]();
-    if(offsetarrayA == nullptr) offsetarrayA = new int[I]();
-    if(offsetarrayAc == nullptr) offsetarrayAc = new int[J]();
+    if(offsetarrayA == nullptr) offsetarrayA = new int[I+1]();
+    if(offsetarrayAc == nullptr) offsetarrayAc = new int[J+1]();
     if(SAindex == nullptr) SAindex = new int[I]();
   } catch (const std::bad_alloc &e) {
     std::cerr << "Error allocating memory for " << e.what() << std::endl;
@@ -58,8 +58,8 @@ void initialize_data_B() {
     if(Bc == nullptr) Bc = new std::vector<int>[J]();
     if(SB == nullptr) SB = new std::vector<int>[I]();
     if(SBc == nullptr) SBc = new std::vector<int>[J]();
-    if(offsetarrayB == nullptr) offsetarrayB = new int[J]();
-    if(offsetarrayBc == nullptr) offsetarrayBc = new int[K]();
+    if(offsetarrayB == nullptr) offsetarrayB = new int[J+1]();
+    if(offsetarrayBc == nullptr) offsetarrayBc = new int[K+1]();
     if(SBcindex == nullptr) SBcindex = new int[K]();
   } catch (const std::bad_alloc &e) {
     std::cerr << "Error allocating memory for " << e.what() << std::endl;

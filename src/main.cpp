@@ -241,6 +241,8 @@ int main(int argc, char *argv[]) {
     totaltagmatch48 += ((int)A[i - 1].size() + 47) / 48;
     totaltagmatch16 += ((int)A[i - 1].size() + 15) / 16;
   }
+  offsetarrayA[0] = 0;
+  offsetarrayA[I] = offsetarrayA[I - 1] + A[I - 1].size();
 
   printf("*** ratio of empty %lf, ratio of not empty %lf\n",
          totalempty / (I * 48.0), 1 - (totalempty / (I * 48.0)));
@@ -249,7 +251,8 @@ int main(int argc, char *argv[]) {
   printf("** ratio tag access 48 %lf\n", I / ((double)I + totaltagmatch48));
   printf("** ratio tag access 16 %lf\n", I / ((double)I + totaltagmatch16));
 
-  for (int i = 1; i < J + 2; i++) {
+  offsetarrayAc[0] = 0;
+  for (int i = 1; i < J+1; i++) {
     offsetarrayAc[i] = offsetarrayAc[i - 1] + Ac[i - 1].size();
   }
 
@@ -370,7 +373,8 @@ int main(int argc, char *argv[]) {
     sort(Bc[k].begin(), Bc[k].end());
   }
 
-  for (int j = 1; j < J; j++) {
+  offsetarrayB[0] = 0;
+  for (int j = 1; j < J+1; j++) {
     int tmplen = B[j - 1].size();
     offsetarrayB[j] = offsetarrayB[j - 1] + tmplen;
 
@@ -388,7 +392,8 @@ int main(int argc, char *argv[]) {
   // move this to above for the weights (1 -> )
   // shortpart += J/(CACHEBLOCKSHORT);
 
-  for (int k = 1; k < K; k++) {
+  offsetarrayBc[0] = 0;
+  for (int k = 1; k < K+1; k++) {
     offsetarrayBc[k] = offsetarrayBc[k - 1] + Bc[k - 1].size();
   }
 
