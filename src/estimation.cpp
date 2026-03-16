@@ -29,7 +29,6 @@ void sampleA() {
                 SAc[A[i][j]].push_back(hash1(i, ha1, hb1, pmod));
                 SAnnz++;
             }
-            SAindex[SIcnt] = i;
             SIcnt++;
         }
     }
@@ -45,7 +44,6 @@ void sampleB() {
                 SB[Bc[k][j]].push_back(hash2(k, ha2, hb2, pmod));
                 SBnnz++;
             }
-            SBcindex[SKcnt] = k;
             SKcnt++;
         }
     }

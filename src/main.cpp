@@ -10,100 +10,63 @@ struct simulator_state sim;
 
 using json = nlohmann::json;
 
-int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <matrix1 name> <matrix2 name> <config filepath>\n"
-                  << "config_filepath is a fully qualified path to the .json config for the run (likely config/config.json).\n"
-                  << std::endl;
-        return 1;
-    }
+struct matrix {
+    const char *mat_name;
+    i16 transpose;
 
-    std::string matrix1_name    = argv[1];
-    std::string matrix2_name    = argv[2];
-    std::string config_filepath = argv[3];
+    u64 nrows;
+    u64 ncols;
+    u64 nzM;    // number of non-zero elements
 
-    std::ifstream file(config_filepath);
-    if (!file.is_open()) {
-        std::cerr << "Error opening config file." << std::endl;
-        return 1;
-    }
+    std::vector<u64>
+        *M,
+        *Mc; 
+    std::vector<u64>
+        *SM,
+        *SMc; 
+    u64
+        *offsetarrayM,
+        *offsetarrayMc;
+};
 
-    json config;
-    file >> config;
-
-    // dataflow = Gust;
-    // format = RR;
-    int transpose = config["transpose"].get<int>();
-    float tmpsram = config["cachesize"].get<float>();
-    cachesize = tmpsram * 262144 * 0.9;
-    inputcachesize = cachesize;
-    float tmpbandw = config["memorybandwidth"].get<float>();
-    HBMbandwidth = (tmpbandw / 4.0) * 0.6;
-    int tmpPE = config["PEcnt"].get<int>();
-    PEcnt = tmpPE;
-    mergecnt = tmpPE;
-    HBMbandwidthperPE = HBMbandwidth / PEcnt;
-    int tmpbank = config["srambank"].get<int>();
-    sramBank = tmpbank;
-    ISCACHE = 1;
-    int baselinetest = config["baselinetest"].get<int>();
-    bool condensedOP = config["condensedOP"].get<bool>();
-    std::string tile_dir = config["tileDir"].get<std::string>();
-    std::string output_dir = config["outputDir"].get<std::string>();
-
-    if (!freopen(("data/" + matrix1_name + ".mtx").c_str(), "r", stdin)) {
-        std::cerr << "Error opening input file." << std::endl;
-        return 1;
-    }
-
-    if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
-                  (baselinetest ? "Base_" : "570Cache_") +
-                  std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
-                  "GBs_" + std::to_string(tmpPE) + "PEs_" +
-                  std::to_string(tmpbank) + "sbanks_" + "_" + matrix1_name + "_" +
-                  matrix2_name + "_" + printFormat[format] + "_" +
-                  (transpose ? "1" : "0") + ".txt")
-                     .c_str(),
-                 "w", stdout)) {
-        std::cerr << "Error opening output folder." << std::endl;
-        return 1;
-    }
+void parse_matrix(FILE *f, struct matrix *x)
+{
+    i16 transpose = x->transpose;
 
     // Lines limited to 1024 characters by spec
-    const std::size_t BUFFERSIZE = 1024;
-    char readbuffer[BUFFERSIZE];
+    #define BUFFER_NBYTES (u64)1024
+    char readbuffer[BUFFER_NBYTES];
 
-    // read and ignore annotation '%' lines
-    while (std::cin.getline(readbuffer, BUFFERSIZE)) {
-        if (readbuffer[0] != '%') {
-            break;
-        }
-    }
-
-    std::sscanf(readbuffer, "%d%d%d", &N, &M, &nzA);
-
-    if (transpose) {
-        swap(N, M);
-    }
-
-    printf("Matrix A: %d x %d, number of non-zeros = %d\n", N, M, nzA);
+    printf("Matrix %s: %d x %d, number of non-zeros = %d\n", x->mat_name, x->nrows, x->ncols, x->nzM);
     fflush(stdout);
 
     samplek = 100;
     samplep = 0.1;
 
-    sim.cfg.I = N;
-    sim.cfg.J = M;
-
-    initialize_data_A();
-
-    string input;
+    try {
+        if (x->M == nullptr)
+            x->M = new std::vector<u64>[x->nrows]();
+        if (x->Mc == nullptr)
+            x->Mc = new std::vector<u64>[x->ncols]();
+        if (x->SM == nullptr)
+            x->SM = new std::vector<u64>[x->nrows]();
+        if (x->SMc == nullptr)
+            x->SMc = new std::vector<u64>[x->ncols]();
+        if (x->offsetarrayM == nullptr)
+            x->offsetarrayM = new u64[x->nrows]();
+        if (x->offsetarrayMc == nullptr)
+            x->offsetarrayMc = new u64[x->ncols]();
+    } catch (const std::bad_alloc &e) {
+        std::cerr << "Error allocating memory for " << e.what() << std::endl;
+        std::exit(1);
+    }
 
     fflush(stdout);
+    std::string input;
 
-    for (int i = 1; i <= nzA; i++) {
-
-        std::getline(std::cin, input);
+    for (int i = 1; i <= x->nzM; i++) {
+        assert(fgets(readbuffer, BUFFER_NBYTES, f));
+        input = readbuffer;
 
         std::istringstream iss(input);
         std::vector<std::string> tokens;
@@ -147,25 +110,159 @@ int main(int argc, char *argv[]) {
             cout << tokens.size() << endl;
             cout << i << endl
                  << input << endl;
-            return 0;
+            return;
         }
 
-        // WARNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
+        // WMRNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
         if (transpose) {
-            Ac[xx - 1].push_back(yy - 1);
-            A[yy - 1].push_back(xx - 1);
+            x->Mc[xx - 1].push_back(yy - 1);
+            x->M[yy - 1].push_back(xx - 1);
         } else {
-            A[xx - 1].push_back(yy - 1);
-            Ac[yy - 1].push_back(xx - 1);
+            x->M[xx - 1].push_back(yy - 1);
+            x->Mc[yy - 1].push_back(xx - 1);
         }
     }
 
-    for (int i = 0; i < sim.cfg.I; i++) {
-        sort(A[i].begin(), A[i].end());
+    for (int i = 0; i < x->nrows; i++) {
+        sort(x->M[i].begin(), x->M[i].end());
     }
-    for (int j = 0; j < sim.cfg.J; j++) {
-        sort(Ac[j].begin(), Ac[j].end());
+    for (int j = 0; j < x->ncols; j++) {
+        sort(x->Mc[j].begin(), x->Mc[j].end());
     }
+
+    for (int i = 1; i < x->nrows; i++)
+        x->offsetarrayM[i] = x->offsetarrayM[i - 1] + x->M[i - 1].size();
+    for (int i = 1; i < x->ncols; i++)
+        x->offsetarrayMc[i]= x->offsetarrayMc[i - 1]+ x->Mc[i - 1].size();
+
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <matrix1 name> <matrix2 name> <config filepath>\n"
+                  << "config_filepath is a fully qualified path to the .json config for the run (likely config/config.json).\n"
+                  << std::endl;
+        return 1;
+    }
+
+    std::string matrix1_name    = argv[1];
+    std::string matrix2_name    = argv[2];
+    std::string config_filepath = argv[3];
+
+    std::ifstream file(config_filepath);
+    if (!file.is_open()) {
+        std::cerr << "Error opening config file." << std::endl;
+        return 1;
+    }
+
+    json config;
+    file >> config;
+
+    int transpose           = config["transpose"].get<int>();
+    float tmpsram           = config["cachesize"].get<float>();
+    float tmpbandw          = config["memorybandwidth"].get<float>();
+    int baselinetest        = config["baselinetest"].get<int>();
+    bool condensedOP        = config["condensedOP"].get<bool>();
+    std::string tile_dir    = config["tileDir"].get<std::string>();
+    std::string output_dir  = config["outputDir"].get<std::string>();
+
+    cachesize = tmpsram * 262144 * 0.9;
+    inputcachesize = cachesize;
+    HBMbandwidth = (tmpbandw / 4.0) * 0.6;
+    int tmpPE = config["PEcnt"].get<int>();
+    PEcnt = tmpPE;
+    mergecnt = tmpPE;
+    HBMbandwidthperPE = HBMbandwidth / PEcnt;
+    int tmpbank = config["srambank"].get<int>();
+    sramBank = tmpbank;
+    ISCACHE = 1;
+
+    std::string matrix1_filepath = "data/" + matrix1_name + ".mtx";
+    std::string matrix2_filepath = "data/" + matrix2_name + ".mtx";
+    FILE *matrix1_file = fopen(matrix1_filepath.c_str(), "r");
+    FILE *matrix2_file = fopen(matrix2_filepath.c_str(), "r");
+    assert(matrix1_file);
+    assert(matrix2_file);
+
+    struct matrix matA = {.mat_name="A"};
+    struct matrix matB = {.mat_name="B"};
+    {
+        #define TEMP_BUFFER_NBYTES 1024
+        char buf[TEMP_BUFFER_NBYTES];
+
+        // read and ignore annotation '%' lines
+        while (fgets(buf, TEMP_BUFFER_NBYTES, matrix1_file)) {
+            if (buf[0] != '%')
+                break;
+        }
+        std::sscanf(buf, "%llu%llu%llu", &matA.nrows, &matA.ncols, &matA.nzM);
+
+        // read and ignore annotation '%' lines
+        while (fgets(buf, TEMP_BUFFER_NBYTES, matrix2_file)) {
+            if (buf[0] != '%')
+                break;
+        }
+        std::sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
+    }
+
+    matA.transpose = (i16)transpose;
+    matB.transpose = (i16)((matB.nrows == matB.ncols) ? transpose : !transpose);
+    if (matA.transpose)
+        swap(matA.ncols, matA.nrows);
+    if (matB.transpose)
+        swap(matB.ncols, matB.nrows);
+    assert(matA.ncols == matB.nrows);
+
+    FILE *tile_file = fopen((tile_dir + matrix1_name).c_str(), "r");
+    assert(tile_file);
+    u64 t_i, t_j, t_k;
+    {
+        #define TEMP_BUFFER_NBYTES 1024
+        char buf[TEMP_BUFFER_NBYTES];
+
+        assert(fgets(buf, TEMP_BUFFER_NBYTES, tile_file));
+        assert(sscanf(buf, "%llu%llu%llu", &t_i, &t_j, &t_k) == 3);
+    }
+
+    const struct config cfg = {
+        .dataflow   = Gust,
+        .interorder = IJK,
+        .format     = RR,
+
+        .I          = matA.nrows,
+        .J          = matA.ncols,
+        .K          = matB.ncols,
+        .iii        = t_i,
+        .jjj        = t_j,
+        .kkk        = t_k,
+        .tti        = div_rup(matA.nrows, t_i),
+        .ttj        = div_rup(matA.ncols, t_j),
+        .ttk        = div_rup(matB.ncols, t_k),
+    };
+    sim = initialize_simulator(&cfg);
+
+
+    if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
+                  (baselinetest ? "Base_" : "570Cache_") +
+                  std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
+                  "GBs_" + std::to_string(tmpPE) + "PEs_" +
+                  std::to_string(tmpbank) + "sbanks_" + "_" + matrix1_name + "_" +
+                  matrix2_name + "_" + printFormat[format] + "_" +
+                  (transpose ? "1" : "0") + ".txt")
+                     .c_str(),
+                 "w", stdout)) {
+        std::cerr << "Error opening output folder." << std::endl;
+        return 1;
+    }
+
+    parse_matrix(matrix1_file, &matA);
+    A   = matA.M;
+    Ac  = matA.Mc;
+    SA  = matA.SM;
+    SAc = matA.SMc;
+    offsetarrayA = matA.offsetarrayM;
+    offsetarrayAc= matA.offsetarrayMc;
 
     if (condensedOP) {
         // memory management for sparchA
@@ -206,7 +303,6 @@ int main(int argc, char *argv[]) {
     long long totaltagmatch16 = 0;
 
     for (int i = 1; i < sim.cfg.I; i++) {
-        offsetarrayA[i] = offsetarrayA[i - 1] + A[i - 1].size();
         if (A[i - 1].size() < 48) {
             totalempty += (48 - A[i - 1].size());
         }
@@ -217,139 +313,23 @@ int main(int argc, char *argv[]) {
 
     printf("*** ratio of empty %lf, ratio of not empty %lf\n",
            totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
-    printf("*** ratio of in cache %lf\n", totalincache / ((double)nzA));
+    printf("*** ratio of in cache %lf\n", totalincache / ((double)matA.nzM));
 
     printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch48));
     printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch16));
-
-    for (int i = 1; i < sim.cfg.J + 2; i++) {
-        offsetarrayAc[i] = offsetarrayAc[i - 1] + Ac[i - 1].size();
-    }
 
     initsample();
 
     sampleA();
 
-    fclose(stdin);
-
     /////////////////////////// input B /////////////////////////////////
-
-    cin.clear();
-    if (!freopen(("data/" + matrix2_name + ".mtx").c_str(), "r", stdin)) {
-        std::cerr << "Error opening input file." << std::endl;
-        return 1;
-    }
-
-    // read and ignore annotation '%' lines
-    while (std::cin.getline(readbuffer, BUFFERSIZE)) {
-        if (readbuffer[0] != '%') {
-            break;
-        }
-    }
-
-    std::sscanf(readbuffer, "%d%d%d", &N, &M, &nzB);
-
-    printf("Matrix B: %d x %d, number of non-zeros = %d\n", N, M, nzB);
-    fflush(stdout);
-
-    // FIXME(ejs): This is extremely confusing. It should not automatically try to invert the matrix
-    // if (and only if !!?) it is non-square. The user should be responsible for storing a separate transpose
-    // version of the matrix (or add some intermediate helper that does the transposition).
-    if (N != M)
-        transpose ^= 1; // when transposeA = 0 -> transposeB = 1; when tranposeA=
-                        // 1-> transposeB = 0
-
-    if (transpose) {
-        swap(N, M);
-    }
-
-    printf("transpose: %d\n", transpose);
-
-    if (sim.cfg.J != N) {
-        printf("Mismatch J!\n");
-        return 0;
-    }
-
-    sim.cfg.K = M;
-
-    initialize_data_B();
-
-    // std::getline(std::cin, input);
-
-    for (int i = 1; i <= nzB; i++) {
-
-        std::getline(std::cin, input);
-
-        std::istringstream iss(input);
-        std::vector<std::string> tokens;
-        std::string token;
-
-        // 将输入行分割为单词
-        while (iss >> token) {
-            tokens.push_back(token);
-        }
-
-        int xx, yy;
-        double zz, lala;
-
-        if (tokens.size() == 2) {
-
-            std::istringstream(tokens[0]) >> xx;
-            std::istringstream(tokens[1]) >> yy;
-            // std::cout << "values: " << xx << ", " << yy << std::endl;
-        } else if (tokens.size() == 3) {
-
-            std::istringstream(tokens[0]) >> xx;
-            std::istringstream(tokens[1]) >> yy;
-            std::istringstream(tokens[2]) >> zz;
-            // std::cout << "values: " << xx << ", " << yy << ", " << zz << std::endl;
-        } else if (tokens.size() == 4) {
-
-            std::istringstream(tokens[0]) >> xx;
-            std::istringstream(tokens[1]) >> yy;
-            std::istringstream(tokens[2]) >> zz;
-            std::istringstream(tokens[2]) >> lala;
-            // std::cout << "values: " << xx << ", " << yy << ", " << zz << std::endl;
-        } else {
-            std::cout << "Format Incorrect! " << std::endl;
-            cout << i << endl
-                 << input << endl;
-            return 0;
-        }
-
-        if (transpose) {
-            Bc[xx - 1].push_back(yy - 1);
-            B[yy - 1].push_back(xx - 1);
-        } else {
-            B[xx - 1].push_back(yy - 1);
-            Bc[yy - 1].push_back(xx - 1);
-        }
-    }
-
-    // cout << N << endl<<M <<endl<< nz << endl << nz/N <<endl;
-
-    for (int j = 0; j < sim.cfg.J; j++) {
-        sort(B[j].begin(), B[j].end());
-    }
-    for (int k = 0; k < sim.cfg.K; k++) {
-        sort(Bc[k].begin(), Bc[k].end());
-    }
-
-    for (int j = 1; j < sim.cfg.J; j++) {
-        offsetarrayB[j] = offsetarrayB[j - 1] + B[j - 1].size();
-    }
-    // two problem:
-    // 1) this calculate way just calculate the minimum
-    // 2) the + J will change is tiling J  -> but actually long will alos change
-    // -> counteract? but the above calculate seems don't consider the emptys
-    // (larger than real) so maybe counteract
-
-    // move this to above for the weights (1 -> )
-    // shortpart += J/(CACHEBLOCKSHORT);
-
-    for (int k = 1; k < sim.cfg.K; k++) {
-        offsetarrayBc[k] = offsetarrayBc[k - 1] + Bc[k - 1].size();
-    }
+    parse_matrix(matrix2_file, &matB);
+    B   = matB.M;
+    Bc  = matB.Mc;
+    SB  = matB.SM;
+    SBc = matB.SMc;
+    offsetarrayB = matB.offsetarrayM;
+    offsetarrayBc= matB.offsetarrayMc;
 
     sampleB();
 
@@ -359,46 +339,12 @@ int main(int argc, char *argv[]) {
 
     /******************Config************************************/
 
-    // notation of J and K in the code is swapped as in the paper
-    // use the paper's notation as print output
     printf("I = %d, K = %d, J = %d\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
     /************************************************************/
 
-    // getParameterSample();
     getParameter();
 
     configPartial(0.05, 0.5, 0.45);
-
-    int t_i, t_j, t_k;
-
-    if (!freopen((tile_dir + matrix1_name).c_str(), "r", stdin)) {
-        std::cerr << "Error opening " << (tile_dir + matrix1_name) << std::endl;
-        return 1;
-    }
-
-    if (std::scanf("%d%d%d", &t_i, &t_j, &t_k) != 3) {
-        std::cerr << "Error reading " << (tile_dir + matrix1_name) << ", expected three integers." << std::endl;
-        return 1;
-    }
-    fclose(stdin);
-
-    const struct config cfg = {
-        .dataflow   = Gust,
-        .interorder = IJK,
-        .format     = RR,
-
-        .I          = (u64)N,
-        .J          = (u64)M,
-        .K          = (u64)M, 
-        .iii        = (u64)t_i,
-        .jjj        = (u64)t_j,
-        .kkk        = (u64)t_k,
-        .tti        = (u64)div_rup(sim.cfg.I, t_i),
-        .ttj        = (u64)div_rup(sim.cfg.J, t_j),
-        .ttk        = (u64)div_rup(sim.cfg.K, t_k),
-    };
-
-    sim = initialize_simulator(&cfg);
 
     /////////////// Baseline configurations
 
@@ -406,8 +352,8 @@ int main(int argc, char *argv[]) {
         // EWH
         // Incorporate SeaCache into baseline
         puts("***************** SeaCache *******************");
-        printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
-               nzB / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj)));
+        printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+               matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj)));
 
         adaptive_prefetch = 1;
         useVirtualTag = 1;

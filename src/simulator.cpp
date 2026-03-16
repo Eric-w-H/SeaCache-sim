@@ -1834,40 +1834,40 @@ struct simulator_state initialize_simulator(const struct config *cfg)
     // alloacte memory
     try {
         if (bufferedC == nullptr)
-            bufferedC = new set<int>[sim.cfg.I]();
+            bufferedC = new set<int>[cfg->I]();
         if (bufferedClen == nullptr)
-            bufferedClen = new int[sim.cfg.I]();
+            bufferedClen = new int[cfg->I]();
         if (beginA == nullptr)
-            beginA = new int[sim.cfg.I]();
+            beginA = new int[cfg->I]();
         if (beginB == nullptr)
-            beginB = new int[sim.cfg.J]();
+            beginB = new int[cfg->J]();
 
         if (beginAc == nullptr)
-            beginAc = new int[sim.cfg.J]();
+            beginAc = new int[cfg->J]();
         if (beginBc == nullptr)
-            beginBc = new int[sim.cfg.K]();
+            beginBc = new int[cfg->K]();
 
         // if(begin == nullptr) new int[];
 
         if (currsizeA == nullptr)
-            currsizeA = new int[sim.cfg.I]();
+            currsizeA = new int[cfg->I]();
         if (currsizeAc == nullptr)
-            currsizeAc = new int[sim.cfg.J]();
+            currsizeAc = new int[cfg->J]();
         if (currsizeB == nullptr)
-            currsizeB = new int[sim.cfg.J]();
+            currsizeB = new int[cfg->J]();
         if (currsizeBc == nullptr)
-            currsizeBc = new int[sim.cfg.J]();
+            currsizeBc = new int[cfg->J]();
 
         if (bufferedsizeB == nullptr)
-            bufferedsizeB = new int[sim.cfg.J]();
+            bufferedsizeB = new int[cfg->J]();
 
         if (tmpC == nullptr)
-            tmpC = new int[sim.cfg.K]();
+            tmpC = new int[cfg->K]();
 
         if (LFUtag == nullptr)
-            LFUtag = new int[sim.cfg.J]();
+            LFUtag = new int[cfg->J]();
         if (nextposvector == nullptr)
-            nextposvector = new queue<int>[sim.cfg.J]();
+            nextposvector = new queue<int>[cfg->J]();
     } catch (const std::bad_alloc &e) {
         std::cerr << "Error allocating memory for " << e.what() << std::endl;
         std::exit(1);
