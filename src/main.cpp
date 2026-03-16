@@ -37,9 +37,6 @@ void parse_matrix(FILE *f, struct matrix *x)
     #define BUFFER_NBYTES (u64)1024
     char readbuffer[BUFFER_NBYTES];
 
-    printf("Matrix %s: %d x %d, number of non-zeros = %d\n", x->mat_name, x->nrows, x->ncols, x->nzM);
-    fflush(stdout);
-
     samplek = 100;
     samplep = 0.1;
 
@@ -61,7 +58,6 @@ void parse_matrix(FILE *f, struct matrix *x)
         std::exit(1);
     }
 
-    fflush(stdout);
     std::string input;
 
     for (int i = 1; i <= x->nzM; i++) {
@@ -196,14 +192,14 @@ int main(int argc, char *argv[])
             if (buf[0] != '%')
                 break;
         }
-        std::sscanf(buf, "%llu%llu%llu", &matA.nrows, &matA.ncols, &matA.nzM);
+        sscanf(buf, "%llu%llu%llu", &matA.nrows, &matA.ncols, &matA.nzM);
 
         // read and ignore annotation '%' lines
         while (fgets(buf, TEMP_BUFFER_NBYTES, matrix2_file)) {
             if (buf[0] != '%')
                 break;
         }
-        std::sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
+        sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
     matA.transpose = (i16)transpose;
@@ -265,6 +261,8 @@ int main(int argc, char *argv[])
     offsetarrayAc= matA.offsetarrayMc;
 
     if (condensedOP) {
+        assert(0); // this path is not maintained
+
         // memory management for sparchA
         sparchA = new std::vector<int>[sim.cfg.J]();
         if (sparchA == nullptr) {
@@ -311,17 +309,6 @@ int main(int argc, char *argv[])
         totaltagmatch16 += ((int)A[i - 1].size() + 15) / 16;
     }
 
-    printf("*** ratio of empty %lf, ratio of not empty %lf\n",
-           totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
-    printf("*** ratio of in cache %lf\n", totalincache / ((double)matA.nzM));
-
-    printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch48));
-    printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch16));
-
-    initsample();
-
-    sampleA();
-
     /////////////////////////// input B /////////////////////////////////
     parse_matrix(matrix2_file, &matB);
     B   = matB.M;
@@ -331,7 +318,36 @@ int main(int argc, char *argv[])
     offsetarrayB = matB.offsetarrayM;
     offsetarrayBc= matB.offsetarrayMc;
 
-    sampleB();
+    {
+        #define PMOD 1000000007 // A large prime number
+        f64 ha1, ha2, hb1, hb2;
+        ha1 = getRandomCoefficient(), hb1 = getRandomCoefficient();
+        ha2 = getRandomCoefficient(), hb2 = getRandomCoefficient();
+
+        // sample A
+        u64 SIcnt = 0; // num sampled rows in A
+        for (int i = 0; i < sim.cfg.I; i++) {
+            if (sampleP()) {
+                for (std::size_t j = 0; j < A[i].size(); j++) {
+                    SA[SIcnt].push_back(A[i][j]);
+                    SAc[A[i][j]].push_back(hash1(i, ha1, hb1, PMOD));
+                }
+                SIcnt++;
+            }
+        }
+
+        // sample B
+        u64 SKcnt = 0; // num sampled cols in B
+        for (int k = 0; k < sim.cfg.K; k++) {
+            if (sampleP()) {
+                for (std::size_t j = 0; j < Bc[k].size(); j++) {
+                    SBc[SKcnt].push_back(Bc[k][j]);
+                    SB[Bc[k][j]].push_back(hash2(k, ha2, hb2, PMOD));
+                }
+                SKcnt++;
+            }
+        }
+    }
 
     if (ISCACHE == 1) {
         setSET();
@@ -339,10 +355,17 @@ int main(int argc, char *argv[])
 
     /******************Config************************************/
 
-    printf("I = %d, K = %d, J = %d\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
+    printf("Matrix A: %llu x %llu, number of non-zeros = %llu\n", matA.nrows, matA.ncols, matA.nzM);
+    printf("*** ratio of empty %lf, ratio of not empty %lf\n", totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
+    printf("*** ratio of in cache %lf\n", totalincache / ((double)matA.nzM));
+    printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch48));
+    printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch16));
+    printf("Matrix B: %llu x %llu, number of non-zeros = %llu\n", matB.nrows, matB.ncols, matB.nzM);
+    printf("transpose: %d\n", matB.transpose);
+    printf("I = %llu, K = %llu, J = %llu\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
     /************************************************************/
 
-    getParameter();
+    getParameter(); // sets estEffMAC
 
     configPartial(0.05, 0.5, 0.45);
 
@@ -352,8 +375,10 @@ int main(int argc, char *argv[])
         // EWH
         // Incorporate SeaCache into baseline
         puts("***************** SeaCache *******************");
-        printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
-               matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj)));
+        printf("nnzB:%llu  K:%llu  J/TJ:%llu  nzlB:%llu\n",
+            matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+            matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
+        );
 
         adaptive_prefetch = 1;
         useVirtualTag = 1;
@@ -378,8 +403,6 @@ int main(int argc, char *argv[])
         CACHEBLOCKLOG = 4;
         setSET();
         runTile(sim.cfg.kkk);
-
-        fflush(stdout);
 
         ////////////  Sparch
         // dynamic FLRU + 128KB prefetch size + 144 words scheme0
@@ -413,8 +436,6 @@ int main(int argc, char *argv[])
         cachesize = inputcachesize;
         setSET();
 
-        fflush(stdout);
-
         ////////////  X-cache
         puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test X-cache   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -432,8 +453,6 @@ int main(int argc, char *argv[])
         CACHEBLOCK = 16;
         CACHEBLOCKLOG = 4;
         setSET();
-
-        fflush(stdout);
 
         puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");
         ISCACHE = 0;

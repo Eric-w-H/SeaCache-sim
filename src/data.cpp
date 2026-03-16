@@ -7,17 +7,17 @@
 #include "headers.h"
 
 
-std::vector<u64>
-    *A = nullptr,  // A[r]  = [c_1, c_2, ..., c_u] are non-zero column indices in row r
-    *Ac = nullptr; // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
-std::vector<u64>
-    *B = nullptr,
-    *Bc = nullptr;
+std::vector<u64> *A   = nullptr;  // A[r]  = [c_1, c_2, ..., c_u] are non-zero column indices in row r
+std::vector<u64> *Ac  = nullptr; // Ac[c] = [r_1, r_2, ..., r_v] are non-zero row indices in column c
+std::vector<u64> *B   = nullptr;
+std::vector<u64> *Bc  = nullptr;
 
-std::vector<int> *sparchA = nullptr;
+std::vector<int> *sparchA   = nullptr;
 
-u64 *offsetarrayA = nullptr, *offsetarrayAc = nullptr;
-u64 *offsetarrayB = nullptr, *offsetarrayBc = nullptr;
+u64 *offsetarrayA     = nullptr;
+u64 *offsetarrayAc    = nullptr;
+u64 *offsetarrayB     = nullptr;
+u64 *offsetarrayBc        = nullptr;
 
 // Let row r be sampled from A, and it is the (r')th sampled row.
 // Then for all indices [(r,c_1), (r,c_2), ..., (r,c_u)] in the row:

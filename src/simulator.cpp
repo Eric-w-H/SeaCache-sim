@@ -96,7 +96,7 @@ void updateBlockA() {
                 break;
 
             int starti = beginAc[tj], tmpi = beginAc[tj];
-            int maxi = offsetarrayAc[tj + 1] = offsetarrayAc[tj];
+            int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
 
             while (tmpi < maxi && Ac[tj][tmpi] < sim.cfg.iii + TI) {
                 tmpi++;
