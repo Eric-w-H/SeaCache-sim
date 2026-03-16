@@ -5,11 +5,6 @@
 #include <string>
 using namespace std;
 
-// smaple parameter p
-extern double samplep;
-// sample parameter k
-extern double samplek;
-
 enum DataFlow {
     Inner, // 0
     Outer, // 1

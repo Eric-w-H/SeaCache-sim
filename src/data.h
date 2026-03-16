@@ -19,8 +19,8 @@ extern u64 *offsetarrayA, *offsetarrayAc;
 extern u64 *offsetarrayB, *offsetarrayBc;
 
 // sample matrix
-extern int SI, SK;
-extern std::vector<u64> *SA, *SAc;
-extern std::vector<u64> *SBc, *SB;
+// extern int SI, SK;
+// extern std::vector<u64> *SA, *SAc;
+// extern std::vector<u64> *SBc, *SB;
 
 #endif // DATA_H

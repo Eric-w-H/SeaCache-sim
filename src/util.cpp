@@ -21,8 +21,3 @@ double hash1(int x, double a, double b, int pmod) {
 double hash2(int x, double a, double b, int pmod) {
     return (double)(std::fmod(a * x + b, pmod)) / pmod;
 }
-
-// Function to generate random coefficients
-double getRandomCoefficient() { return dis(gen); }
-
-bool sampleP() { return dis(gen) < samplep; }

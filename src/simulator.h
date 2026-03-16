@@ -22,6 +22,8 @@ struct simulator_state {
     struct config cfg;
 };
 
+
+extern struct Arena *global_persist;
 extern struct simulator_state sim;
 
 extern int cachesize;

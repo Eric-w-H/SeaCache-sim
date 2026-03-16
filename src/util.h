@@ -13,7 +13,5 @@ static std::uniform_real_distribution<> dis(0.0, 1.0);
 
 double hash1(int x, double a, double b, int pmod);
 double hash2(int x, double a, double b, int pmod);
-double getRandomCoefficient();
-bool sampleP();
 
 #endif // UTIL_H
