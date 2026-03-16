@@ -87,6 +87,5 @@ unsigned short getOrig(long long addr);
 void setSET();
 
 void initialize_cache();
-void deinitialize_cache();
 
 #endif

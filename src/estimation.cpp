@@ -20,7 +20,7 @@ void initsample() {
 
 void sampleA() {
     // work on the sample
-    for (int i = 0; i < I; i++) {
+    for (int i = 0; i < sim.cfg.I; i++) {
         // Be the sampled row in probability p
         if (sampleP()) {
             for (std::size_t j = 0; j < A[i].size(); j++) {
@@ -37,7 +37,7 @@ void sampleA() {
 
 void sampleB() {
     // work on the sample
-    for (int k = 0; k < K; k++) {
+    for (int k = 0; k < sim.cfg.K; k++) {
         // Be the sampled col in probability p
         if (sampleP()) {
             for (std::size_t j = 0; j < Bc[k].size(); j++) {
@@ -218,7 +218,7 @@ vector<double> vectorTK[8195];
 void newestnnzCTK() {
 
     int maxkkk = 4096;
-    int maxTK = (J + 4095) / 4096;
+    int maxTK = (sim.cfg.J + 4095) / 4096;
 
     double prevf = -1;
     int prevtk = -1;
@@ -274,7 +274,7 @@ void getParameterSample() {
 
     auto time0 = std::chrono::high_resolution_clock::now();
 
-    for (int j = 0; j < J; j++) {
+    for (int j = 0; j < sim.cfg.J; j++) {
 
         int tmpsizea = SAc[j].size();
         int tmpsizeb = SB[j].size();
@@ -319,7 +319,7 @@ void getParameterSample() {
 
     double pnow = 1.0;
 
-    for (int j = 0; j < J; j++) {
+    for (int j = 0; j < sim.cfg.J; j++) {
 
         int tmpsizea = SAc[j].size();
         int tmpsizeb = SB[j].size();
@@ -459,7 +459,7 @@ void getParameterSample() {
     // use TJ in the code to represent TK
 
     cTJ = 128;
-    csizeJ = J / cTJ;
+    csizeJ = sim.cfg.J / cTJ;
 
     for (int i = 0; i < SIcnt; i++) {
         for (int k = 0; k < SKcnt; k++) {
@@ -532,10 +532,10 @@ void getParameter() {
     std::unique_ptr<map<int, bool>[]> estC;
     std::unique_ptr<int[]> startA, endA, endB;
     try {
-        estC = std::make_unique<map<int, bool>[]>(std::max(I, J));
-        startA = std::make_unique<int[]>(std::max(I, J));
-        endA = std::make_unique<int[]>(I);
-        endB = std::make_unique<int[]>(J);
+        estC = std::make_unique<map<int, bool>[]>(max(sim.cfg.I, sim.cfg.J));
+        startA = std::make_unique<int[]>(max(sim.cfg.I, sim.cfg.J));
+        endA = std::make_unique<int[]>(sim.cfg.I);
+        endB = std::make_unique<int[]>(sim.cfg.J);
     } catch (const std::bad_alloc &e) {
         std::cerr << "Allocation failed: " << e.what() << std::endl;
         exit(1);
@@ -547,13 +547,13 @@ void getParameter() {
     estEffMAC = 0;
     estnnzC = 0;
 
-    for (int i = 0; i < I; i++)
+    for (int i = 0; i < sim.cfg.I; i++)
         endA[i] = A[i].size();
 
-    for (int j = 0; j < J; j++)
+    for (int j = 0; j < sim.cfg.J; j++)
         endB[j] = B[j].size();
 
-    for (int i = 0; i < I; i++) {
+    for (int i = 0; i < sim.cfg.I; i++) {
         int lenA = endA[i];
         for (int j = 0; j < lenA; j++) {
             int tmpx = A[i][j];
@@ -581,12 +581,12 @@ void getParameter() {
     // calculate nnzCTk
 
     // force version. compute the nnzCTk for Tiling 2/4/6/8,,,512
-    int Ttcnt = 1, Tsize = J;
+    int Ttcnt = 1, Tsize = sim.cfg.J;
     for (int jj = 1; jj <= 10; jj++) {
         Ttcnt *= 2;
         Tsize /= 2;
 
-        for (int j = 0; j < J; j++) {
+        for (int j = 0; j < sim.cfg.J; j++) {
             startA[j] = 0;
             estC[j].clear();
         }
@@ -595,7 +595,7 @@ void getParameter() {
         // calculate Tcnt blocks
         for (int tcnt = 0; tcnt < Ttcnt; tcnt++) {
 
-            for (int i = 0; i < I; i++) {
+            for (int i = 0; i < sim.cfg.I; i++) {
                 for (int j = startA[i];; j++) {
                     if (j >= endA[i]) {
                         startA[i] = j;
@@ -616,7 +616,7 @@ void getParameter() {
                 }
             }
 
-            for (int j = 0; j < J; j++) {
+            for (int j = 0; j < sim.cfg.J; j++) {
                 estC[j].clear();
             }
             boundnow += Tsize;
@@ -626,14 +626,6 @@ void getParameter() {
         fflush(stdout);
     }
 }
-
-// double getvarianceBJ(int ttj) { return 1; }
-double getvarianceBJ(int) { return 1; }
-
-// double getvarianceBK(int ttk) { return 1; }
-double getvarianceBK(int) { return 1; }
-
-long long getnnzC(int jj) { return nnzCTk[getlog(jj)]; }
 
 long long estSRAM, estDRAM, estPE, esttotal;
 long long estpreSram, estpreDram;
@@ -646,168 +638,7 @@ long long estpreA, estpreB, estpostC;
 long long estmin = 1LL << 60;
 long long estsquaremin = 1LL << 60;
 
-int estiii, estjjj, estkkk;
-int esttti, estttj, estttk;
-
-long long gustest(int estsum) {
-
-    estSRAM = estDRAM = estPE = esttotal = 0;
-    estpreSram = estpreDram = 0;
-    estpostSram = estpostDram = 0;
-    estcomputeSram = estcomputeDram = 0;
-    esttotalA = esttotalB = esttotalC = 0;
-    estpreA = estpreB = estpostC = 0;
-    estcomputeA = estcomputeB = estcomputeC = 0;
-
-    ////////////////////////// version1: estimate without nnzCTk
-
-    /////// pre load stage //////////////////////////////////
-
-    long long avgTileSize = min((nzB * 3) / (ttj * ttk) + (2 * jjj), Bsize);
-
-    if (!ISCACHE) {
-        // pre load B
-
-        // If the inter-tile change is I this time, then B can be reused and don't
-        // need to reload again. If the inter-tile change is J or K, then need to
-        // reload min(this tile size, Bsize) at each round. i.e., when interorder ==
-        // **I, load TJ*TK*(avg tile size) else, load TI*TJ*TK*(avg tile size) (will
-        // have TI times of redundant)
-
-        // have inter-reuse B. need less load
-        if ((interorder == JKI) || (interorder == KJI)) {
-            estpreB += (long long)ttj * ttk * memoryBandwidthWhole(avgTileSize);
-            estpreDram += (long long)ttj * ttk * memoryBandwidthWhole(avgTileSize);
-            estpreSram += (long long)ttj * ttk * sramWriteBandwidth(avgTileSize);
-        } // don't have inter-reuse B
-        else {
-            estpreB += (long long)(tti)*ttj * ttk * memoryBandwidthWhole(avgTileSize);
-            estpreDram +=
-                (long long)(tti)*ttj * ttk * memoryBandwidthWhole(avgTileSize);
-            estpreSram +=
-                (long long)(tti)*ttj * ttk * sramWriteBandwidth(avgTileSize);
-        }
-    }
-
-    estpreSram /= sramBank;
-    esttotal += max(estpreSram, estpreDram);
-
-    ////// calculate stage////////////////////////////////////
-
-    estPE = estEffMAC;
-
-    // B access
-    // sram access for B: all
-    estcomputeSram +=
-        (long long)tti * sramReadBandwidth(estEffMAC * 3LL + 2LL * J * ttk);
-
-    long long cacheTileSize;
-    double esthitrateB;
-
-    if (!estsum) {
-        cacheTileSize = min((nzB * 3) / (ttj * ttk) + (jjj), Bsize);
-
-        // this is the upperbound of hitrate. hitrate will be lower when tiles are
-        // not uniform.
-        esthitrateB =
-            min((double)cacheTileSize / ((nzB * 3) / (ttj * ttk) + (jjj)), 1.0);
-
-    } else {
-        esthitrateB = ((double)estsum) / ((nzB * 3) / (ttj * ttk) + jjj);
-        esthitrateB = min(esthitrateB, 1.0);
-
-        // printf("%d %lf\n", estsum, esthitrateB);
-    }
-    estcomputeDram +=
-        (long long)tti *
-        memoryBandwidthPE((estEffMAC * 3LL + 2LL * J * ttk) * (1 - esthitrateB));
-    estcomputeB +=
-        (long long)tti *
-        memoryBandwidthPE((estEffMAC * 3LL + 2LL * J * ttk) * (1 - esthitrateB));
-
-    double esthitrateC = 0;
-
-    int usennzTK = 1;
-    if (!usennzTK) {
-        estcomputeSram +=
-            (long long)(ttj)*sramWriteBandwidth(estnnzC * 3LL + 2LL * I * (ttk));
-
-        estcomputeDram += (long long)(ttj)*memoryBandwidthPE(
-            (estnnzC * 3LL + 2LL * I * (ttk)) * (1 - esthitrateC));
-        estcomputeC += (long long)(ttj)*memoryBandwidthPE(
-            (estnnzC * 3LL + 2LL * I * (ttk)) * (1 - esthitrateC));
-
-        if (jjj != J) {
-            estpostC += (long long)(ttj)*memoryBandwidthPE(
-                (estnnzC * 3LL + 2LL * I * (ttk)) * (1 - esthitrateC));
-            estpostDram += (long long)(ttj)*memoryBandwidthPE(
-                (estnnzC * 3LL + 2LL * I * (ttk)) * (1 - esthitrateC));
-        }
-    } else {
-
-        estcomputeSram += sramWriteBandwidth(getnnzC(ttj) * 3LL + 2LL * I * (ttk));
-        estcomputeDram += memoryBandwidthPE((getnnzC(ttj) * 3LL + 2LL * I * (ttk)) *
-                                            (1 - esthitrateC));
-        estcomputeC += memoryBandwidthPE(((getnnzC(ttj) * 3LL + 2LL * I * (ttk))) *
-                                         (1 - esthitrateC));
-
-        if (jjj != J) {
-
-            estpostC += memoryBandwidthPE(((getnnzC(ttj) * 3LL + 2LL * I * (ttk))) *
-                                          (1 - esthitrateC));
-            estpostDram += memoryBandwidthPE(
-                ((getnnzC(ttj) * 3LL + 2LL * I * (ttk))) * (1 - esthitrateC));
-        }
-    }
-
-    // A access
-    estcomputeDram +=
-        (long long)(ttk)*memoryBandwidthPE((nzA * 3LL + 2LL * I * (ttj)));
-    estcomputeSram +=
-        (long long)(ttk)*memoryBandwidthPE((nzA * 3LL + 2LL * I * (ttj)));
-    estcomputeA +=
-        (long long)(ttk)*memoryBandwidthPE((nzA * 3LL + 2LL * I * (ttj)));
-
-    esttotal += max(estPE / PEcnt,
-                    max(estcomputeDram / PEcnt, estcomputeSram / sramBank));
-
-    //////// post stage/////////////////////////////////////
-    // The inter-tile C merge
-    if (dataflow == Gust) {
-        if (jjj != J) {
-            estpostC += memoryBandwidthPE(estnnzC * 3LL + 2LL * I);
-            estpostDram += memoryBandwidthPE(estnnzC * 3LL + 2LL * I);
-        }
-    }
-
-    esttotal += max(estpostDram / PEcnt, estpostSram / sramBank);
-
-    // int estsquareiii, estsquarejjj, estsquarekkk;
-    // int estsquaretti, estsquarettj, estsquarettk;
-
-    // if (jjj == kkk) {
-    //   if (esttotal < estsquaremin) {
-    //     estsquaremin = esttotal;
-    //     estsquareiii = iii;
-    //     estsquarejjj = jjj;
-    //     estsquarekkk = kkk;
-    //     estsquaretti = tti;
-    //     estsquarettj = ttj;
-    //     estsquarettk = ttk;
-    //   }
-    // }
-
-    if (esttotal < estmin) {
-
-        estmin = esttotal;
-
-        estiii = iii;
-        estjjj = jjj;
-        estkkk = kkk;
-        esttti = tti;
-        estttj = ttj;
-        estttk = ttk;
-    }
-
-    return esttotal;
+long long gustest(const struct config *cfg, int estsum)
+{
+    return 0;
 }

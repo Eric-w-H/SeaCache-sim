@@ -30,6 +30,5 @@ void readInputMatrices(const char *fileA, const char *fileB);
 
 void initialize_data_A();
 void initialize_data_B();
-void deinitialize_data();
 
 #endif // DATA_H

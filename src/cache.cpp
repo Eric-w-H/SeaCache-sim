@@ -364,7 +364,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         int fiberid = addr >> CACHEBLOCKLOG;
         int tmpblocksize = CACHEBLOCK;
         tmpblocksize -= currsizeB[fiberid] * 3;
-        while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + jjj)) {
+        while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + sim.cfg.jjj)) {
             if (currsizeB[fiberid + fibercnt] * 3 <= tmpblocksize) {
                 tmpblocksize -= currsizeB[fiberid + fibercnt] * 3;
                 fibercnt++;
@@ -853,7 +853,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         int tmpaddr = offsetarrayB[jj] * 3;
         // add the current bias of this row
         tmpaddr += beginB[jj] * 3;
-        tmpaddr += J;
+        tmpaddr += sim.cfg.J;
 
         // need to read a whole line here
         // a for loop for each related cacheline. (may more then scehme1)
@@ -1040,7 +1040,6 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 int last_cache_set = 0;
 void initialize_cache() {
     if (SET != last_cache_set) {
-        deinitialize_cache();
         last_cache_set = SET;
     }
     try {
@@ -1062,48 +1061,4 @@ void initialize_cache() {
         std::cerr << "Error allocating memory for " << e.what() << std::endl;
         std::exit(1);
     }
-}
-
-void deinitialize_cache() {
-    if (Valid != nullptr)
-        delete[] Valid;
-    if (Tag != nullptr)
-        delete[] Tag;
-    if (lrubit != nullptr)
-        delete[] lrubit;
-    if (lfubit != nullptr)
-        delete[] lfubit;
-
-    if (virtualValid != nullptr)
-        delete[] virtualValid;
-    if (virtualTag != nullptr)
-        delete[] virtualTag;
-    if (virtuallfubit != nullptr)
-        delete[] virtuallfubit;
-
-    if (PosOrig != nullptr)
-        delete[] PosOrig;
-    if (vPosOrig != nullptr)
-        delete[] vPosOrig;
-
-    if (Cnt != nullptr)
-        delete[] Cnt;
-    if (Next != nullptr)
-        delete[] Next;
-
-    // (re)set all the pointers to nullptr
-    Valid = nullptr;
-    Tag = nullptr;
-    lrubit = nullptr;
-    lfubit = nullptr;
-
-    virtualValid = nullptr;
-    virtualTag = nullptr;
-    virtuallfubit = nullptr;
-
-    PosOrig = nullptr;
-    vPosOrig = nullptr;
-
-    Cnt = nullptr;
-    Next = nullptr;
 }

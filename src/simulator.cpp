@@ -67,8 +67,8 @@ void updateBlockA() {
     case Inner:
     case Gust:
         // Row-majored
-        for (int ti = TI; ti < TI + iii; ti++) {
-            if (ti >= I)
+        for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
+            if (ti >= sim.cfg.I)
                 break;
 
             int startj = beginA[ti], tmpj = beginA[ti];
@@ -81,7 +81,7 @@ void updateBlockA() {
             // solution: add a update fuction after pre-load B
 
             // check: will pre_load use this currsizeA and currsizeB ? -> cause cycle
-            while (tmpj < maxj && A[ti][tmpj] < jjj + TJ) {
+            while (tmpj < maxj && A[ti][tmpj] < sim.cfg.jjj + TJ) {
                 tmpj++;
             }
 
@@ -91,14 +91,14 @@ void updateBlockA() {
     
     case Outer:
         // Col-majored
-        for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj >= J)
+        for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+            if (tj >= sim.cfg.J)
                 break;
 
             int starti = beginAc[tj], tmpi = beginAc[tj];
             int maxi = offsetarrayAc[tj + 1] = offsetarrayAc[tj];
 
-            while (tmpi < maxi && Ac[tj][tmpi] < iii + TI) {
+            while (tmpi < maxi && Ac[tj][tmpi] < sim.cfg.iii + TI) {
                 tmpi++;
             }
 
@@ -114,14 +114,14 @@ void updateBlockB() {
     case Outer:
     case Gust:
         // Row-majored
-        for (int tj = TJ; tj < TJ + jjj; tj++) {
-            if (tj >= J)
+        for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+            if (tj >= sim.cfg.J)
                 break;
 
             int startk = beginB[tj], tmpk = beginB[tj],
                 maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
-            while (tmpk < maxk && B[tj][tmpk] < kkk + TK) {
+            while (tmpk < maxk && B[tj][tmpk] < sim.cfg.kkk + TK) {
                 tmpk++;
             }
 
@@ -131,14 +131,14 @@ void updateBlockB() {
 
     case Inner:
         // Col-majored
-        for (int tk = TK; tk < TK + kkk; tk++) {
-            if (tk >= K)
+        for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
+            if (tk >= sim.cfg.K)
                 break;
 
             int startj = beginBc[tk], tmpj = beginBc[tk],
                 maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
-            while (tmpj < maxj && Bc[tk][tmpj] < jjj + TJ) {
+            while (tmpj < maxj && Bc[tk][tmpj] < sim.cfg.jjj + TJ) {
                 tmpj++;
             }
 
@@ -151,8 +151,8 @@ void updateBlockB() {
 
 // each time after update TJ
 void updateBeginA() {
-    for (int ti = TI; ti < TI + iii; ti++) {
-        if (ti >= I)
+    for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
+        if (ti >= sim.cfg.I)
             break;
 
         // int startj = beginA[ti];
@@ -169,7 +169,7 @@ void updateBeginA() {
 }
 
 void ALLupdateBeginAc() {
-    for (int tj = 0; tj < J; tj++) {
+    for (int tj = 0; tj < sim.cfg.J; tj++) {
         // int starti = beginAc[tj];
         int tmpi = beginAc[tj];
         int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
@@ -183,7 +183,7 @@ void ALLupdateBeginAc() {
 }
 
 void AllupdateBeginA() {
-    for (int ti = 0; ti < I; ti++) {
+    for (int ti = 0; ti < sim.cfg.I; ti++) {
         // int startj = beginA[ti];
         int tmpj = beginA[ti];
         int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
@@ -198,8 +198,8 @@ void AllupdateBeginA() {
 
 // each time update TI
 void updateBeginAc() {
-    for (int tj = TJ; tj < TJ + jjj; tj++) {
-        if (tj >= J)
+    for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+        if (tj >= sim.cfg.J)
             break;
 
         // int starti = beginAc[tj];
@@ -217,7 +217,7 @@ void updateBeginAc() {
 void AllupdateBeginB() {
 
     // update beginB
-    for (int tj = 0; tj < J; tj++) {
+    for (int tj = 0; tj < sim.cfg.J; tj++) {
         int tmpk = beginB[tj];
         int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -232,7 +232,7 @@ void AllupdateBeginB() {
 void AllupdateBeginBc() {
 
     // update beginBc
-    for (int tk = 0; tk < K; tk++) {
+    for (int tk = 0; tk < sim.cfg.K; tk++) {
         int tmpj = beginBc[tk];
         int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -248,8 +248,8 @@ void AllupdateBeginBc() {
 void updateBeginB() {
 
     // update beginB
-    for (int tj = TJ; tj < TJ + jjj; tj++) {
-        if (tj >= J)
+    for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+        if (tj >= sim.cfg.J)
             break;
 
         int tmpk = beginB[tj];
@@ -266,8 +266,8 @@ void updateBeginB() {
 // eachtime update TJ
 void updateBeginBc() {
     // update beginBc
-    for (int tk = TK; tk < TK + kkk; tk++) {
-        if (tk >= K)
+    for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
+        if (tk >= sim.cfg.K)
             break;
 
         int tmpj = beginBc[tk];
@@ -298,7 +298,7 @@ bool isJK() {
 }
 
 void updateTI() {
-    TI += iii;
+    TI += sim.cfg.iii;
 
     if (isIJ()) {
         ALLupdateBeginAc();
@@ -308,7 +308,7 @@ void updateTI() {
 }
 
 void updateTJ() {
-    TJ += jjj;
+    TJ += sim.cfg.jjj;
 
     if (isIJ()) {
         updateBeginA();
@@ -324,7 +324,7 @@ void updateTJ() {
 }
 
 void updateTK() {
-    TK += kkk;
+    TK += sim.cfg.kkk;
 
     if (isJK()) {
         updateBeginB();
@@ -336,28 +336,28 @@ void updateTK() {
 bool iterate_inner_loop() {
     if ((interorder == IJK) || (interorder == JIK)) {
         // adddyn
-        if (TK + kkk < K) {
+        if (TK + sim.cfg.kkk < sim.cfg.K) {
             updateTK();
             return 1;
         } else {
-            TK += kkk;
+            TK += sim.cfg.kkk;
             return 0;
         }
     } else if ((interorder == IKJ) || (interorder == KIJ)) {
-        if (TJ + jjj < J) {
+        if (TJ + sim.cfg.jjj < sim.cfg.J) {
             updateTJ();
             return 1;
         } else {
-            TJ += jjj;
+            TJ += sim.cfg.jjj;
             return 0;
         }
     } else if ((interorder == JKI) || (interorder == KJI)) {
-        if (TI + iii < I) {
+        if (TI + sim.cfg.iii < sim.cfg.I) {
             updateTI();
             return 1;
 
         } else {
-            TI += iii;
+            TI += sim.cfg.iii;
             return 0;
         }
     }
@@ -367,27 +367,27 @@ bool iterate_inner_loop() {
 
 bool iterate_mid_loop() {
     if ((interorder == IKJ) || (interorder == JKI)) {
-        if (TK + kkk < K) {
+        if (TK + sim.cfg.kkk < sim.cfg.K) {
             updateTK();
             return 1;
         } else {
-            TK += kkk;
+            TK += sim.cfg.kkk;
             return 0;
         }
     } else if ((interorder == IJK) || (interorder == KJI)) {
-        if (TJ + jjj < J) {
+        if (TJ + sim.cfg.jjj < sim.cfg.J) {
             updateTJ();
             return 1;
         } else {
-            TJ += jjj;
+            TJ += sim.cfg.jjj;
             return 0;
         }
     } else if ((interorder == JIK) || (interorder == KIJ)) {
-        if (TI + iii < I) {
+        if (TI + sim.cfg.iii < sim.cfg.I) {
             updateTI();
             return 1;
         } else {
-            TI += iii;
+            TI += sim.cfg.iii;
             return 0;
         }
     }
@@ -397,27 +397,27 @@ bool iterate_mid_loop() {
 
 bool iterate_outer_loop() {
     if ((interorder == KIJ) || (interorder == KJI)) {
-        if (TK + kkk < K) {
+        if (TK + sim.cfg.kkk < sim.cfg.K) {
             updateTK();
             return 1;
         } else {
-            TK += kkk;
+            TK += sim.cfg.kkk;
             return 0;
         }
     } else if ((interorder == JIK) || (interorder == JKI)) {
-        if (TJ + jjj < J) {
+        if (TJ + sim.cfg.jjj < sim.cfg.J) {
             updateTJ();
             return 1;
         } else {
-            TJ += jjj;
+            TJ += sim.cfg.jjj;
             return 0;
         }
     } else if ((interorder == IJK) || (interorder == IKJ)) {
-        if (TI + iii < I) {
+        if (TI + sim.cfg.iii < sim.cfg.I) {
             updateTI();
             return 1;
         } else {
-            TI += iii;
+            TI += sim.cfg.iii;
             return 0;
         }
     }
@@ -430,11 +430,11 @@ void reverse_I() {
 
     // reinitialize A
     if (isIJ()) {
-        for (int tmpj = 0; tmpj < J; tmpj++) {
+        for (int tmpj = 0; tmpj < sim.cfg.J; tmpj++) {
             beginAc[tmpj] = 0;
         }
     } else {
-        for (int tmpj = TJ; tmpj < TJ + jjj; tmpj++) {
+        for (int tmpj = TJ; tmpj < TJ + sim.cfg.jjj; tmpj++) {
             beginAc[tmpj] = 0;
         }
     }
@@ -445,22 +445,22 @@ void reverse_J() {
     TJ = 0;
     // reinitialize A
     if (isIJ()) {
-        for (int tmpi = TI; tmpi < TI + iii; tmpi++) {
+        for (int tmpi = TI; tmpi < TI + sim.cfg.iii; tmpi++) {
             beginA[tmpi] = 0;
         }
     } else {
-        for (int tmpi = 0; tmpi < I; tmpi++) {
+        for (int tmpi = 0; tmpi < sim.cfg.I; tmpi++) {
             beginA[tmpi] = 0;
         }
     }
 
     // reinitialize Bc
     if (isJK()) {
-        for (int tmpk = 0; tmpk < K; tmpk++) {
+        for (int tmpk = 0; tmpk < sim.cfg.K; tmpk++) {
             beginBc[tmpk] = 0;
         }
     } else {
-        for (int tmpk = TK; tmpk < TK + kkk; tmpk++) {
+        for (int tmpk = TK; tmpk < TK + sim.cfg.kkk; tmpk++) {
             beginBc[tmpk] = 0;
         }
     }
@@ -471,11 +471,11 @@ void reverse_K() {
     // reinitialize B
     if (isJK()) {
 
-        for (int tmpj = TJ; tmpj < TJ + jjj; tmpj++) {
+        for (int tmpj = TJ; tmpj < TJ + sim.cfg.jjj; tmpj++) {
             beginB[tmpj] = 0;
         }
     } else {
-        for (int tmpj = 0; tmpj < J; tmpj++) {
+        for (int tmpj = 0; tmpj < sim.cfg.J; tmpj++) {
             beginB[tmpj] = 0;
         }
     }
@@ -541,15 +541,15 @@ bool checkAndLoadReuseA() {
 
                 // on-chip fiber start
 
-                for (int ti = TI; ti < TI + iii; ti++) {
-                    if (ti >= I)
+                for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
+                    if (ti >= sim.cfg.I)
                         break;
                     Asizenow++;
 
                     int startj = beginA[ti], tmpj = beginA[ti],
                         maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
 
-                    while (tmpj < maxj && A[ti][tmpj] < jjj + TJ) {
+                    while (tmpj < maxj && A[ti][tmpj] < sim.cfg.jjj + TJ) {
                         tmpj++;
                     }
 
@@ -652,11 +652,11 @@ void pre_load_B() {
             int _TJ;
             // int _TK;
 
-            for (tj = TJ; tj < TJ + jjj; tj++) {
-                if (tj >= J)
+            for (tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+                if (tj >= sim.cfg.J)
                     break;
 
-                if ((tj - TJ) < (jjj / 2)) {
+                if ((tj - TJ) < (sim.cfg.jjj / 2)) {
                     _TJ = 0;
                 } else {
                     _TJ = 1;
@@ -670,12 +670,12 @@ void pre_load_B() {
 
                 int halfk = beginB[tj];
 
-                while (halfk < maxk && B[tj][halfk] < (kkk / 2) + TK) {
+                while (halfk < maxk && B[tj][halfk] < (sim.cfg.kkk / 2) + TK) {
                     halfk++;
                 }
                 tmpk = halfk;
 
-                while (tmpk < maxk && B[tj][tmpk] < kkk + TK) {
+                while (tmpk < maxk && B[tj][tmpk] < sim.cfg.kkk + TK) {
                     tmpk++;
                 }
 
@@ -711,18 +711,18 @@ void pre_load_B() {
             // can't do this
 
             // estimated fiberlet fragment waste
-            Bsizenow += ((fiberletlength + 1) / 2) * jjj;
+            Bsizenow += ((fiberletlength + 1) / 2) * sim.cfg.jjj;
 
             // on-chip fiber current
-            Bsizenow += jjj;
+            Bsizenow += sim.cfg.jjj;
 
             // Initialize
-            for (int tj = TJ; tj < TJ + jjj; tj++) {
+            for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
                 bufferedsizeB[tj] = 0;
             }
 
-            for (int tk = TK; tk < TK + kkk; tk++) {
-                if (tk >= K)
+            for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
+                if (tk >= sim.cfg.K)
                     break;
 
                 int startj = beginBc[tk], tmpj = beginBc[tk],
@@ -730,7 +730,7 @@ void pre_load_B() {
 
                 while (tmpj < maxj) {
                     int tmpindex = Bc[tk][tmpj];
-                    if (tmpindex >= TJ + jjj) {
+                    if (tmpindex >= TJ + sim.cfg.jjj) {
                         break;
                     }
                     tmpj++;
@@ -775,8 +775,8 @@ void pre_load_B() {
             int tk;
             // 这里preload就是为了确定dynamic的
             // for(tk = TK; tk < TK+((ISDYNAMICK)?dynk:kkk); tk ++){
-            for (tk = TK; tk < TK + kkk; tk++) {
-                if (tk >= K)
+            for (tk = TK; tk < TK + sim.cfg.kkk; tk++) {
+                if (tk >= sim.cfg.K)
                     break;
 
                 // on-chip fiber start
@@ -785,7 +785,7 @@ void pre_load_B() {
                 int startj = beginBc[tk], tmpj = beginBc[tk],
                     maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
-                while (tmpj < maxj && Bc[tk][tmpj] < jjj + TJ) {
+                while (tmpj < maxj && Bc[tk][tmpj] < sim.cfg.jjj + TJ) {
                     tmpj++;
                 }
 
@@ -815,18 +815,18 @@ void pre_load_B() {
             // inconsistent format
 
             // estimated fiberlet fragment waste
-            Bsizenow += ((fiberletlength + 1) / 2) * kkk;
+            Bsizenow += ((fiberletlength + 1) / 2) * sim.cfg.kkk;
 
             // on-chip fiber current
-            Bsizenow += kkk;
+            Bsizenow += sim.cfg.kkk;
 
             // initialize
-            for (int tk = TK; tk < TK + kkk; tk++) {
+            for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
                 bufferedsizeB[tk] = 0;
             }
 
-            for (int tj = TJ; tj < TJ + jjj; tj++) {
-                if (tj >= J)
+            for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
+                if (tj >= sim.cfg.J)
                     break;
 
                 int startk = beginB[tj], tmpk = beginB[tj],
@@ -834,7 +834,7 @@ void pre_load_B() {
 
                 while (tmpk < maxk) {
                     int tmpindex = B[tj][tmpk];
-                    if (tmpindex >= TK + kkk) {
+                    if (tmpindex >= TK + sim.cfg.kkk) {
                         break;
                     }
                     tmpk++;
@@ -975,10 +975,10 @@ void get_B_fiber(int jj, int ii) {
 
             if (fulltagB) {
                 computeDramAccess +=
-                    (memoryBandwidthPE(3)) * ((long long)TK + kkk - fullB);
+                    (memoryBandwidthPE(3)) * ((long long)TK + sim.cfg.kkk - fullB);
                 computeB +=
-                    (memoryBandwidthPE(3)) * (long long)((long long)TK + kkk - fullB);
-                AccessByte += 3 * (long long)((long long)TK + kkk - fullB);
+                    (memoryBandwidthPE(3)) * (long long)((long long)TK + sim.cfg.kkk - fullB);
+                AccessByte += 3 * (long long)((long long)TK + sim.cfg.kkk - fullB);
             }
         }
 
@@ -1091,7 +1091,7 @@ void updateCAccess(int ii) {
         // increase)
         int deltaC = 0;
         // int oldsize = bufferedClen[ii];
-        for (int k1 = TK; k1 < TK + kkk; k1++) {
+        for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
             if (tmpC[k1]) {
                 // the k1 is a new element
                 if (bufferedC[ii].find(k1) == bufferedC[ii].end()) {
@@ -1125,7 +1125,7 @@ void updateCAccess(int ii) {
 
             Csizenow = 0;
 
-            for (int i = TI; i < TI + iii; i++) {
+            for (int i = TI; i < TI + sim.cfg.iii; i++) {
                 bufferedC[i]    = std::set<int>();
                 bufferedClen[i] = 0;
             }
@@ -1135,7 +1135,7 @@ void updateCAccess(int ii) {
         // update with compute
         int cntc = 0;
 
-        for (int k1 = TK; k1 < TK + kkk; k1++) {
+        for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
             if (tmpC[k1]) {
                 cntc++;
             }
@@ -1145,7 +1145,7 @@ void updateCAccess(int ii) {
         computeC += memoryBandwidthPE(cntc * 3);
         AccessByte += cntc * 3;
 
-        if (jjj != J) {
+        if (sim.cfg.jjj != sim.cfg.J) {
             // multiply 2 here if kkk != K
             // because need a extra inter-tile C merge and thus need an extra load
             postDramAccess += memoryBandwidthPE(cntc * 3);
@@ -1164,11 +1164,11 @@ void get_B_fibers(int ii) {
         int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
         // tmpc = 0
-        for (int k1 = TK; k1 < TK + kkk; k1++) {
+        for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
             tmpC[k1] = 0;
         }
 
-        while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
+        while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
             // coordinate of required B fiber
             int jj = A[ii][tmpj];
 
@@ -1238,10 +1238,10 @@ void get_B_fibers(int ii) {
 
             if (fulltagA) {
                 computeDramAccess +=
-                    (memoryBandwidthPE(3)) * ((long long)TJ + jjj - fullA);
+                    (memoryBandwidthPE(3)) * ((long long)TJ + sim.cfg.jjj - fullA);
                 computeA +=
-                    (memoryBandwidthPE(3)) * (long long)((long long)TJ + jjj - fullA);
-                AccessByte += 3 * ((long long)TJ + jjj - fullA);
+                    (memoryBandwidthPE(3)) * (long long)((long long)TJ + sim.cfg.jjj - fullA);
+                AccessByte += 3 * ((long long)TJ + sim.cfg.jjj - fullA);
             }
         }
 
@@ -1291,7 +1291,7 @@ bool prefetchrow(int ii) {
     // - how can they POSSIBLY guarantee that all the needed A columns are in cache? This is
     // essentially oracle access/cheating
     // - they are not charging for these accesses into metadata (e.g. increment computeSramAccess or something)
-    while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
+    while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
         // coordinate of required B fiber
         // in this prefetch: push the next access queue of jj a ii
         int jj = A[ii][tmpj];
@@ -1494,8 +1494,8 @@ void update_prefetch_size() {
             }
         }
 
-        current_prefetch_size = std::max(current_prefetch_size, 1.0 / 256.0);
-        current_prefetch_size = std::min(current_prefetch_size, 0.10);
+        current_prefetch_size = max(current_prefetch_size, 1.0 / 256.0);
+        current_prefetch_size = min(current_prefetch_size, 0.10);
 
         prefetchSize = current_prefetch_size * inputcachesize;
         cachesize = inputcachesize - prefetchSize;
@@ -1591,8 +1591,8 @@ void update_prefetch_size() {
         }
     }
 
-    current_prefetch_size = std::max(current_prefetch_size, 1.0 / 256.0);
-    current_prefetch_size = std::min(current_prefetch_size, 0.1);
+    current_prefetch_size = max(current_prefetch_size, 1.0 / 256.0);
+    current_prefetch_size = min(current_prefetch_size, 0.1);
 
     prefetchSize = current_prefetch_size * inputcachesize;
     cachesize = inputcachesize - prefetchSize;
@@ -1636,8 +1636,8 @@ void calculate() {
             // reinitialize the next pointer for FLRU
             if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
                 cacheScheme == CACHE_SCHEME_SPARCH) {
-                for (int j1 = TJ; j1 < TJ + jjj; j1++) {
-                    if (j1 > J)
+                for (int j1 = TJ; j1 < TJ + sim.cfg.jjj; j1++) {
+                    if (j1 > sim.cfg.J)
                         break;
                     while (!nextposvector[j1].empty()) {
                         nextposvector[j1].pop();
@@ -1649,14 +1649,14 @@ void calculate() {
                 // QUESTION(ejs): Note that len(LFUtag) = J (i.e. num cols in A / num rows in B).
                 // Why the hell is the LFUtag array being cleared to 0 every iteration?
                 // How can this be tracking the corresponding B row frequency accurately?
-                for (int j1 = TJ; j1 < TJ + jjj; j1++) {
+                for (int j1 = TJ; j1 < TJ + sim.cfg.jjj; j1++) {
                     LFUtag[j1] = 0;
                 }
             }
 
             // first prefill the prefetch window
-            for (int ii = 0; prefetchNow < prefetchSize && ii < iii; ii++) {
-                if (TI + ii > I)
+            for (int ii = 0; prefetchNow < prefetchSize && ii < sim.cfg.iii; ii++) {
+                if (TI + ii > sim.cfg.I)
                     break;
 
                 prefetchRowNow = TI + ii;
@@ -1667,8 +1667,8 @@ void calculate() {
             }
         }
 
-        for (int ii = 0; ii < iii; ii++) {
-            if (TI + ii > I)
+        for (int ii = 0; ii < sim.cfg.iii; ii++) {
+            if (TI + ii > sim.cfg.I)
                 break;
 
             // get O(J) corresponding B (different from Gust and Inner)
@@ -1699,7 +1699,7 @@ void calculate() {
                     continue;
 
                 // QUESTION(ejs): Why are we updating prefetchRowNow / calling prefetchrow again?
-                while (prefetchRowNow < TI + iii) {
+                while (prefetchRowNow < TI + sim.cfg.iii) {
                     if (!prefetchrow(prefetchRowNow)) {
                         break;
                     }
@@ -1720,11 +1720,11 @@ void calculate() {
     case Inner: {
 
         // update B here
-        for (int k = TK; k < TK + kkk; k++) {
-            get_B_fiber_col_iii(k, iii);
+        for (int k = TK; k < TK + sim.cfg.kkk; k++) {
+            get_B_fiber_col_iii(k, sim.cfg.iii);
         }
 
-        for (int ii = 0; ii < iii; ii++) {
+        for (int ii = 0; ii < sim.cfg.iii; ii++) {
 
             // update A
             // get A
@@ -1736,11 +1736,11 @@ void calculate() {
             int maxj = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
 
             // tmpc = 0
-            for (int k1 = TK; k1 < TK + kkk; k1++) {
+            for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
                 tmpC[k1] = 0;
             }
 
-            while (tmpj < maxj && A[TI + ii][tmpj] < TJ + jjj) {
+            while (tmpj < maxj && A[TI + ii][tmpj] < TJ + sim.cfg.jjj) {
                 // coordinate of required B fiber
                 int jj = A[TI + ii][tmpj];
 
@@ -1756,7 +1756,7 @@ void calculate() {
 
     case Outer: {
 
-        for (int jj = 0; jj < jjj; jj++) {
+        for (int jj = 0; jj < sim.cfg.jjj; jj++) {
             get_A_fiber_col(TJ + jj);
 
             // use a dumb jj
@@ -1766,16 +1766,16 @@ void calculate() {
         fulltagC = 0;
         Csizenow = 0;
 
-        for (int ii = TI; ii < TI + iii; ii++) {
+        for (int ii = TI; ii < TI + sim.cfg.iii; ii++) {
             int tmpj = beginA[ii];
             int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
             // tmpc = 0
-            for (int k1 = TK; k1 < TK + kkk; k1++) {
+            for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
                 tmpC[k1] = 0;
             }
 
-            while (tmpj < maxj && A[ii][tmpj] < TJ + jjj) {
+            while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
                 // coordinate of required B fiber
                 int jj = A[ii][tmpj];
 
@@ -1787,7 +1787,7 @@ void calculate() {
             }
 
             int cntc = 0;
-            for (int k1 = TK; k1 < TK + kkk; k1++) {
+            for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
                 if (tmpC[k1]) {
                     cntc++;
                 }
@@ -1801,12 +1801,12 @@ void calculate() {
                     Csizenow += cntc * 3;
                     // can be stored in sram!
                     computeSramAccess +=
-                        sramReadBandwidth(cntc * 3 + 2) * (jjj / mergecnt);
+                        sramReadBandwidth(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
                 }
             } else {
-                computeDramAccess += memoryBandwidthPE(cntc * 3 + 2) * (jjj / mergecnt);
-                computeC += memoryBandwidthPE(cntc * 3 + 2) * (jjj / mergecnt);
-                AccessByte += (cntc * 3 + 2) * (jjj / mergecnt);
+                computeDramAccess += memoryBandwidthPE(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
+                computeC += memoryBandwidthPE(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
+                AccessByte += (cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
             }
         }
     }
@@ -1829,81 +1829,53 @@ void configPartial(float partialA, float partialB, float partialC) {
     Csize = cachesize * partialC;
 }
 
-void initialize_simulator() {
+struct simulator_state initialize_simulator(const struct config *cfg)
+{
     // alloacte memory
     try {
         if (bufferedC == nullptr)
-            bufferedC = new set<int>[I]();
+            bufferedC = new set<int>[sim.cfg.I]();
         if (bufferedClen == nullptr)
-            bufferedClen = new int[I]();
+            bufferedClen = new int[sim.cfg.I]();
         if (beginA == nullptr)
-            beginA = new int[I]();
+            beginA = new int[sim.cfg.I]();
         if (beginB == nullptr)
-            beginB = new int[J]();
+            beginB = new int[sim.cfg.J]();
 
         if (beginAc == nullptr)
-            beginAc = new int[J]();
+            beginAc = new int[sim.cfg.J]();
         if (beginBc == nullptr)
-            beginBc = new int[K]();
+            beginBc = new int[sim.cfg.K]();
 
         // if(begin == nullptr) new int[];
 
         if (currsizeA == nullptr)
-            currsizeA = new int[I]();
+            currsizeA = new int[sim.cfg.I]();
         if (currsizeAc == nullptr)
-            currsizeAc = new int[J]();
+            currsizeAc = new int[sim.cfg.J]();
         if (currsizeB == nullptr)
-            currsizeB = new int[J]();
+            currsizeB = new int[sim.cfg.J]();
         if (currsizeBc == nullptr)
-            currsizeBc = new int[J]();
+            currsizeBc = new int[sim.cfg.J]();
 
         if (bufferedsizeB == nullptr)
-            bufferedsizeB = new int[J]();
+            bufferedsizeB = new int[sim.cfg.J]();
 
         if (tmpC == nullptr)
-            tmpC = new int[K]();
+            tmpC = new int[sim.cfg.K]();
 
         if (LFUtag == nullptr)
-            LFUtag = new int[J]();
+            LFUtag = new int[sim.cfg.J]();
         if (nextposvector == nullptr)
-            nextposvector = new queue<int>[J]();
+            nextposvector = new queue<int>[sim.cfg.J]();
     } catch (const std::bad_alloc &e) {
         std::cerr << "Error allocating memory for " << e.what() << std::endl;
         std::exit(1);
     }
-}
 
-void deinitialize_simulator() {
-    if (bufferedC != nullptr)
-        delete[] bufferedC;
-    if (bufferedClen != nullptr)
-        delete[] bufferedClen;
-    if (beginA != nullptr)
-        delete[] beginA;
-    if (beginB != nullptr)
-        delete[] beginB;
-
-    if (beginAc != nullptr)
-        delete[] beginAc;
-    if (beginBc != nullptr)
-        delete[] beginBc;
-
-    // if(begin != nullptr) delete[] int[];
-
-    if (currsizeA != nullptr)
-        delete[] currsizeA;
-    if (currsizeAc != nullptr)
-        delete[] currsizeAc;
-    if (currsizeB != nullptr)
-        delete[] currsizeB;
-    if (currsizeBc != nullptr)
-        delete[] currsizeBc;
-
-    if (bufferedsizeB != nullptr)
-        delete[] bufferedsizeB;
-
-    if (tmpC != nullptr)
-        delete[] tmpC;
+    return (struct simulator_state) {
+        .cfg    = *cfg
+    };
 }
 
 void reinitialize() {
@@ -1937,20 +1909,20 @@ void reinitialize() {
 
     // reinitialize buffer c
     Csizenow = 0;
-    for (int i = 0; i < I; i++) {
+    for (int i = 0; i < sim.cfg.I; i++) {
         bufferedC[i]    = std::set<int>();
         bufferedClen[i] = 0;
     }
 
     // reinitialize management dtaa
-    for (int ti = 0; ti < I; ti++) {
+    for (int ti = 0; ti < sim.cfg.I; ti++) {
         beginA[ti] = 0;
     }
-    for (int tj = 0; tj < J; tj++) {
+    for (int tj = 0; tj < sim.cfg.J; tj++) {
         beginAc[tj] = 0;
         beginB[tj] = 0;
     }
-    for (int tk = 0; tk < K; tk++) {
+    for (int tk = 0; tk < sim.cfg.K; tk++) {
         beginBc[tk] = 0;
     }
 }
@@ -1959,11 +1931,11 @@ int getcntc(int ii) {
     int tmpj = beginA[ii];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
-    for (int k1 = 0; k1 < K; k1++) {
+    for (int k1 = 0; k1 < sim.cfg.K; k1++) {
         tmpC[k1] = 0;
     }
 
-    while (tmpj < maxj && A[ii][tmpj] < J) {
+    while (tmpj < maxj && A[ii][tmpj] < sim.cfg.J) {
         // coordinate of required B fiber
         int jj = A[ii][tmpj];
 
@@ -1974,7 +1946,7 @@ int getcntc(int ii) {
 
     int cntc = 0;
 
-    for (int k1 = 0; k1 < K; k1++) {
+    for (int k1 = 0; k1 < sim.cfg.K; k1++) {
         if (tmpC[k1]) {
             cntc++;
         }
@@ -1991,9 +1963,9 @@ void postTileMerge() {
     // already added in the C writing position for gust and IP
 
     if (dataflow == Gust) {
-        if (jjj != J) {
+        if (sim.cfg.jjj != sim.cfg.J) {
 
-            for (int ii = 0; ii < I; ii++) {
+            for (int ii = 0; ii < sim.cfg.I; ii++) {
 
                 int cntc = getcntc(ii);
 
@@ -2007,13 +1979,13 @@ void postTileMerge() {
     // calculate the inter-cost of outer
     if (dataflow == Outer) {
 
-        for (int ii = 0; ii < I; ii++) {
+        for (int ii = 0; ii < sim.cfg.I; ii++) {
 
             int cntc = getcntc(ii);
 
-            postDramAccess += memoryBandwidthPE(cntc * 3) * (ttj);
-            postC += memoryBandwidthPE(cntc * 3) * (ttj);
-            AccessByte += cntc * 3 * ttj;
+            postDramAccess += memoryBandwidthPE(cntc * 3) * (sim.cfg.ttj);
+            postC += memoryBandwidthPE(cntc * 3) * (sim.cfg.ttj);
+            AccessByte += cntc * 3 * sim.cfg.ttj;
         }
         //   analyze_statistics();
     }
@@ -2025,219 +1997,9 @@ void postTileMerge() {
     postCycle += max(postDramAccess, postSramAccess);
 }
 
-static inline
-void update_T()
+
+void run()
 {
-    // finetune the tile size after each tile calculating it's Tcnt.
-    // similar to the static finetune stage
-
-    int oldiii = iii;
-    int oldjjj = jjj;
-    int oldkkk = kkk;
-
-    int oldtti = tti;
-    int oldttj = ttj;
-    int oldttk = ttk;
-
-    // int iii2 = (iii + 1) / 2;
-    int jjj2 = (jjj + 1) / 2;
-    int kkk2 = (kkk + 1) / 2;
-
-    // int tti2 = tti * 2;
-    int ttj2 = ttj * 2;
-    int ttk2 = ttk * 2;
-
-    // int estsum = 0;
-
-    // jjj+kkk type 0
-    // Tcnt need to clear and recalculate at each round, sizejksum and tilesum not
-    int sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 + oldjjj;
-    sizejksum[0] += min(sizejk, Bsize);
-    iii = oldiii;
-    jjj = oldjjj;
-    kkk = oldkkk;
-    tti = oldtti;
-    ttj = oldttj;
-    ttk = oldttk;
-    //  printf("!!! sizejksum:%lld  tilesum:%d\n", sizejksum[0], tilesum);
-    fflush(stdout);
-    long long mintime = gustest(sizejksum[0] / (tilesum));
-    int mintype = 0;
-
-    // jjj/2 + kkk type1
-    sizejk = (Tcnt[0][0] + Tcnt[0][1]) * 3 + jjj2;
-    sizejksum[1] += min(sizejk, Bsize);
-    sizejk = (Tcnt[1][0] + Tcnt[1][1]) * 3 + jjj2;
-    sizejksum[1] += min(sizejk, Bsize);
-
-    iii = oldiii;
-    jjj = jjj2;
-    kkk = oldkkk;
-    tti = oldtti;
-    ttj = ttj2;
-    ttk = oldttk;
-    long long tmptime = gustest(sizejksum[1] / (tilesum * 2));
-    tmptime *= 1.1;
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 1;
-    }
-
-    // jjj + kkk/2 type2
-    sizejk = (Tcnt[0][0] + Tcnt[1][0]) * 3 + oldjjj;
-    sizejksum[2] += min(sizejk, Bsize);
-    sizejk = (Tcnt[0][1] + Tcnt[1][1]) * 3 + oldjjj;
-    sizejksum[2] += min(sizejk, Bsize);
-
-    iii = oldiii;
-    jjj = oldjjj;
-    kkk = kkk2;
-    tti = oldtti;
-    ttj = oldttj;
-    ttk = ttk2;
-    tmptime = gustest(sizejksum[2] / (tilesum * 2));
-    tmptime *= 1.1;
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 2;
-    }
-
-    // jjj/2 + kkk/2 type3
-    sizejk = (Tcnt[0][0]) * 3 + jjj2;
-    sizejksum[3] += min(sizejk, Bsize);
-    sizejk = (Tcnt[0][1]) * 3 + jjj2;
-    sizejksum[3] += min(sizejk, Bsize);
-    sizejk = (Tcnt[1][0]) * 3 + jjj2;
-    sizejksum[3] += min(sizejk, Bsize);
-    sizejk = (Tcnt[1][1]) * 3 + jjj2;
-    sizejksum[3] += min(sizejk, Bsize);
-
-    iii = oldiii;
-    jjj = jjj2;
-    kkk = kkk2;
-    tti = oldtti;
-    ttj = ttj2;
-    ttk = ttk2;
-    tmptime = gustest(sizejksum[3] / (tilesum * 4));
-    tmptime *= 1.1;
-    if (tmptime < mintime) {
-        mintime = tmptime;
-        mintype = 3;
-    }
-
-    // only can increase when *2 < I/J/K, otherwise overflow
-    // jjj*2 + kkk type4
-    if (oldjjj * 2 < J) {
-        sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 +
-                oldjjj * 2;
-        sizejksum[4] += min(sizejk, Bsize);
-        iii = oldiii;
-        jjj = oldjjj * 2;
-        kkk = oldkkk;
-        tti = oldtti;
-        ttj = oldttj / 2;
-        ttk = oldttk;
-        tmptime = gustest(sizejksum[4] / (tilesum));
-        tmptime *= 1.1;
-        if (tmptime < mintime) {
-            mintime = tmptime;
-            mintype = 4;
-        }
-    }
-
-    // jjj + kkk*2 type5
-    if (oldkkk * 2 < K) {
-        sizejk =
-            (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 + oldjjj;
-        sizejksum[5] += min(sizejk, Bsize);
-        iii = oldiii;
-        jjj = oldjjj;
-        kkk = oldkkk * 2;
-        tti = oldtti;
-        ttj = oldttj;
-        ttk = oldttk / 2;
-        tmptime = gustest(sizejksum[5] / (tilesum));
-        tmptime *= 1.1;
-        if (tmptime < mintime) {
-            mintime = tmptime;
-            mintype = 5;
-        }
-    }
-
-    // jjj*2 + kkk*2 type6
-    if ((oldjjj * 2 < J) && (oldkkk * 2 < K)) {
-        sizejk = (Tcnt[0][0] + Tcnt[0][1] + Tcnt[1][0] + Tcnt[1][1]) * 3 * 4 +
-                oldjjj * 2;
-        sizejksum[6] += min(sizejk, Bsize);
-        iii = oldiii;
-        jjj = oldjjj * 2;
-        kkk = oldkkk * 2;
-        tti = oldtti;
-        ttj = oldttj / 2;
-        ttk = oldttk / 2;
-        tmptime = gustest(sizejksum[6] / (tilesum));
-        tmptime *= 1.1;
-        if (tmptime < mintime) {
-            mintime = tmptime;
-            mintype = 6;
-        }
-    }
-
-    // jjj/2 + kkk*2  type7
-    if (oldkkk * 2 < K) {
-        sizejk = (Tcnt[0][0] + Tcnt[0][1]) * 3 * 2 + jjj2;
-        sizejksum[7] += min(sizejk, Bsize);
-
-        sizejk = (Tcnt[1][0] + Tcnt[1][1]) * 3 * 2 + jjj2;
-        sizejksum[7] += min(sizejk, Bsize);
-
-        iii = oldiii;
-        jjj = jjj2;
-        kkk = oldkkk * 2;
-        tti = oldtti;
-        ttj = ttj2;
-        ttk = oldttk / 2;
-        tmptime = gustest(sizejksum[7] / (tilesum * 2));
-        tmptime *= 1.1;
-        if (tmptime < mintime) {
-            mintime = tmptime;
-            mintype = 7;
-        }
-    }
-
-    // jjj*2 + kkk/2 type8
-    if (oldjjj * 2 < J) {
-        sizejk = (Tcnt[0][0] + Tcnt[1][0]) * 3 * 2 + jjj;
-        sizejksum[8] += min(sizejk, Bsize);
-
-        sizejk = (Tcnt[0][1] + Tcnt[1][1]) * 3 * 2 + jjj;
-        sizejksum[8] += min(sizejk, Bsize);
-
-        iii = oldiii;
-        jjj = oldjjj * 2;
-        kkk = kkk2;
-        tti = oldtti;
-        ttj = oldttj / 2;
-        ttk = ttk2;
-        tmptime = gustest(sizejksum[8] / (tilesum * 2));
-        tmptime *= 1.1;
-        if (tmptime < mintime) {
-            mintime = tmptime;
-            mintype = 8;
-        }
-    }
-
-    // don't change the actual tiling here, (only change _iii/_jjj/_kkk)
-    // change until next time inter-tile update of i/j/k.
-    iii = oldiii;
-    jjj = oldjjj;
-    kkk = oldkkk;
-    tti = oldtti;
-    ttj = oldttj;
-    ttk = oldttk;
-}
-
-void run() {
     reinitialize();
 
     if (adaptive_prefetch) {
@@ -2274,12 +2036,12 @@ void run() {
         data_access_total = 0;
     }
 
-    if (iii > I)
-        iii = I;
-    if (jjj > J)
-        jjj = J;
-    if (kkk > K)
-        kkk = K;
+    if (sim.cfg.iii > sim.cfg.I)
+        sim.cfg.iii = sim.cfg.I;
+    if (sim.cfg.jjj > sim.cfg.J)
+        sim.cfg.jjj = sim.cfg.J;
+    if (sim.cfg.kkk > sim.cfg.K)
+        sim.cfg.kkk = sim.cfg.K;
 
     // initialize Tcnt before each tile running
     memset(Tcnt, 0, sizeof(Tcnt));
@@ -2321,8 +2083,6 @@ void run() {
                 // dimension is the inner-most dimension. here we use Tcnt00, Tcnt01,
                 // Tcnt10, Tcnt11 to udpate _TI/_TJ/_TK
 
-                update_T();
-
             } // update TI/TJ/TK; update beginA/B/C if TI/J/K don't overflow
             while (iterate_inner_loop());
 
@@ -2335,7 +2095,8 @@ void run() {
     analyze_statistics();
 }
 
-void runTile(int iii, int jjj, int kkk, long long tti, long long ttj, long long ttk) {
+void runTile(int kkk)
+{
     assert(ISCACHE);
 
     // deal with the opt metadata

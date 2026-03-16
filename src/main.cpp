@@ -6,40 +6,23 @@
 #include <cstdlib>
 #include <fstream>
 
+struct simulator_state sim;
+
 using json = nlohmann::json;
 
 int main(int argc, char *argv[]) {
-    // Clean up memory at exit
-    if (std::atexit(deinitialize_data)) {
-        std::cout << "Error registering deinitialize_data in atexit" << std::endl;
-        return 1;
-    }
-    if (std::atexit(deinitialize_simulator)) {
-        std::cout << "Error registering deinitialize_simulator in atexit" << std::endl;
-        return 1;
-    }
-    if (std::atexit(deinitialize_cache)) {
-        std::cout << "Error registering deinitialize_cache in atexit" << std::endl;
-        return 1;
-    }
-
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " matrix1 matrix2 config/file/path\n"
-                  << "\nSearch locations for matrix1 and matrix2, in order:\n"
-                  << "  ./largedata/matrix1/matrix1.mtx\n"
-                  << "  ./data/matrix1.mtx\n"
-                  << "  ./dense/matrix1.mtx\n"
-                  << "  ./bfs/matrix1.mtx\n"
-                  << "config_file is a fully qualified path to the .json config for the run (likely config/config.json).\n"
+        std::cerr << "Usage: " << argv[0] << " <matrix1 name> <matrix2 name> <config filepath>\n"
+                  << "config_filepath is a fully qualified path to the .json config for the run (likely config/config.json).\n"
                   << std::endl;
         return 1;
     }
 
-    std::string matrix_name1 = argv[1];
-    std::string matrix_name2 = argv[2];
-    std::string config_file = argv[3];
+    std::string matrix1_name    = argv[1];
+    std::string matrix2_name    = argv[2];
+    std::string config_filepath = argv[3];
 
-    std::ifstream file(config_file);
+    std::ifstream file(config_filepath);
     if (!file.is_open()) {
         std::cerr << "Error opening config file." << std::endl;
         return 1;
@@ -48,8 +31,8 @@ int main(int argc, char *argv[]) {
     json config;
     file >> config;
 
-    dataflow = Gust;
-    format = RR;
+    // dataflow = Gust;
+    // format = RR;
     int transpose = config["transpose"].get<int>();
     float tmpsram = config["cachesize"].get<float>();
     cachesize = tmpsram * 262144 * 0.9;
@@ -68,25 +51,17 @@ int main(int argc, char *argv[]) {
     std::string tile_dir = config["tileDir"].get<std::string>();
     std::string output_dir = config["outputDir"].get<std::string>();
 
-    if (!freopen(
-            ("largedata/" + matrix_name1 + "/" + matrix_name1 + ".mtx").c_str(),
-            "r", stdin)) {
-        if (!freopen(("data/" + matrix_name1 + ".mtx").c_str(), "r", stdin)) {
-            if (!freopen(("dense/" + matrix_name1 + ".mtx").c_str(), "r", stdin)) {
-                if (!freopen(("bfs/" + matrix_name1 + ".mtx").c_str(), "r", stdin)) {
-                    std::cerr << "Error opening input file." << std::endl;
-                    return 1;
-                }
-            }
-        }
+    if (!freopen(("data/" + matrix1_name + ".mtx").c_str(), "r", stdin)) {
+        std::cerr << "Error opening input file." << std::endl;
+        return 1;
     }
 
     if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
                   (baselinetest ? "Base_" : "570Cache_") +
                   std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
                   "GBs_" + std::to_string(tmpPE) + "PEs_" +
-                  std::to_string(tmpbank) + "sbanks_" + "_" + matrix_name1 + "_" +
-                  matrix_name1 + "_" + printFormat[format] + "_" +
+                  std::to_string(tmpbank) + "sbanks_" + "_" + matrix1_name + "_" +
+                  matrix2_name + "_" + printFormat[format] + "_" +
                   (transpose ? "1" : "0") + ".txt")
                      .c_str(),
                  "w", stdout)) {
@@ -117,8 +92,8 @@ int main(int argc, char *argv[]) {
     samplek = 100;
     samplep = 0.1;
 
-    I = N;
-    J = M;
+    sim.cfg.I = N;
+    sim.cfg.J = M;
 
     initialize_data_A();
 
@@ -185,16 +160,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for (int i = 0; i < I; i++) {
+    for (int i = 0; i < sim.cfg.I; i++) {
         sort(A[i].begin(), A[i].end());
     }
-    for (int j = 0; j < J; j++) {
+    for (int j = 0; j < sim.cfg.J; j++) {
         sort(Ac[j].begin(), Ac[j].end());
     }
 
     if (condensedOP) {
         // memory management for sparchA
-        sparchA = new std::vector<int>[J]();
+        sparchA = new std::vector<int>[sim.cfg.J]();
         if (sparchA == nullptr) {
             if (sparchA != nullptr)
                 delete[] sparchA;
@@ -205,15 +180,15 @@ int main(int argc, char *argv[]) {
         // if use the condensed OP dataflow, need to preprocess the A matrix into
         // the condensed format first. first put the data into sparchA[], then put
         // it back to A[], and call gust dataflow
-        for (int j = 0; j < J; j++) {
-            for (int i = 0; i < I; i++) {
+        for (int j = 0; j < sim.cfg.J; j++) {
+            for (int i = 0; i < sim.cfg.I; i++) {
                 if (static_cast<int>(A[i].size()) > j) {
                     sparchA[j].push_back(A[i][j]);
                 }
             }
         }
 
-        for (int j = 0; j < J; j++) {
+        for (int j = 0; j < sim.cfg.J; j++) {
             A[j].clear();
             for (int i = 0; i < static_cast<int>(sparchA[j].size()); i++) {
                 A[j].push_back(sparchA[j][i]);
@@ -230,7 +205,7 @@ int main(int argc, char *argv[]) {
     long long totaltagmatch48 = 0;
     long long totaltagmatch16 = 0;
 
-    for (int i = 1; i < I; i++) {
+    for (int i = 1; i < sim.cfg.I; i++) {
         offsetarrayA[i] = offsetarrayA[i - 1] + A[i - 1].size();
         if (A[i - 1].size() < 48) {
             totalempty += (48 - A[i - 1].size());
@@ -241,13 +216,13 @@ int main(int argc, char *argv[]) {
     }
 
     printf("*** ratio of empty %lf, ratio of not empty %lf\n",
-           totalempty / (I * 48.0), 1 - (totalempty / (I * 48.0)));
+           totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
     printf("*** ratio of in cache %lf\n", totalincache / ((double)nzA));
 
-    printf("** ratio tag access 48 %lf\n", I / ((double)I + totaltagmatch48));
-    printf("** ratio tag access 16 %lf\n", I / ((double)I + totaltagmatch16));
+    printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch48));
+    printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch16));
 
-    for (int i = 1; i < J + 2; i++) {
+    for (int i = 1; i < sim.cfg.J + 2; i++) {
         offsetarrayAc[i] = offsetarrayAc[i - 1] + Ac[i - 1].size();
     }
 
@@ -260,18 +235,9 @@ int main(int argc, char *argv[]) {
     /////////////////////////// input B /////////////////////////////////
 
     cin.clear();
-    //  freopen(("data/" + matrix_name2+".mtx").c_str(), "r", stdin);
-    if (!freopen(
-            ("largedata/" + matrix_name2 + "/" + matrix_name2 + ".mtx").c_str(),
-            "r", stdin)) {
-        if (!freopen(("data/" + matrix_name2 + ".mtx").c_str(), "r", stdin)) {
-            if (!freopen(("dense/" + matrix_name2 + ".mtx").c_str(), "r", stdin)) {
-                if (!freopen(("bfs/" + matrix_name2 + ".mtx").c_str(), "r", stdin)) {
-                    std::cerr << "Error opening input file." << std::endl;
-                    return 1;
-                }
-            }
-        }
+    if (!freopen(("data/" + matrix2_name + ".mtx").c_str(), "r", stdin)) {
+        std::cerr << "Error opening input file." << std::endl;
+        return 1;
     }
 
     // read and ignore annotation '%' lines
@@ -299,12 +265,12 @@ int main(int argc, char *argv[]) {
 
     printf("transpose: %d\n", transpose);
 
-    if (J != N) {
+    if (sim.cfg.J != N) {
         printf("Mismatch J!\n");
         return 0;
     }
 
-    K = M;
+    sim.cfg.K = M;
 
     initialize_data_B();
 
@@ -362,14 +328,14 @@ int main(int argc, char *argv[]) {
 
     // cout << N << endl<<M <<endl<< nz << endl << nz/N <<endl;
 
-    for (int j = 0; j < J; j++) {
+    for (int j = 0; j < sim.cfg.J; j++) {
         sort(B[j].begin(), B[j].end());
     }
-    for (int k = 0; k < K; k++) {
+    for (int k = 0; k < sim.cfg.K; k++) {
         sort(Bc[k].begin(), Bc[k].end());
     }
 
-    for (int j = 1; j < J; j++) {
+    for (int j = 1; j < sim.cfg.J; j++) {
         offsetarrayB[j] = offsetarrayB[j - 1] + B[j - 1].size();
     }
     // two problem:
@@ -381,7 +347,7 @@ int main(int argc, char *argv[]) {
     // move this to above for the weights (1 -> )
     // shortpart += J/(CACHEBLOCKSHORT);
 
-    for (int k = 1; k < K; k++) {
+    for (int k = 1; k < sim.cfg.K; k++) {
         offsetarrayBc[k] = offsetarrayBc[k - 1] + Bc[k - 1].size();
     }
 
@@ -395,7 +361,7 @@ int main(int argc, char *argv[]) {
 
     // notation of J and K in the code is swapped as in the paper
     // use the paper's notation as print output
-    printf("I = %d, K = %d, J = %d\n", I, K, J);
+    printf("I = %d, K = %d, J = %d\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
     /************************************************************/
 
     // getParameterSample();
@@ -405,25 +371,34 @@ int main(int argc, char *argv[]) {
 
     int t_i, t_j, t_k;
 
-    if (!freopen((tile_dir + matrix_name1).c_str(), "r", stdin)) {
-        std::cerr << "Error opening " << (tile_dir + matrix_name1) << std::endl;
+    if (!freopen((tile_dir + matrix1_name).c_str(), "r", stdin)) {
+        std::cerr << "Error opening " << (tile_dir + matrix1_name) << std::endl;
         return 1;
     }
 
     if (std::scanf("%d%d%d", &t_i, &t_j, &t_k) != 3) {
-        std::cerr << "Error reading " << (tile_dir + matrix_name1) << ", expected three integers." << std::endl;
+        std::cerr << "Error reading " << (tile_dir + matrix1_name) << ", expected three integers." << std::endl;
         return 1;
     }
     fclose(stdin);
 
-    iii = t_i;
-    jjj = t_j;
-    kkk = t_k;
-    tti = (I + iii - 1) / iii;
-    ttj = (J + jjj - 1) / jjj;
-    ttk = (K + kkk - 1) / kkk;
+    const struct config cfg = {
+        .dataflow   = Gust,
+        .interorder = IJK,
+        .format     = RR,
 
-    initialize_simulator();
+        .I          = (u64)N,
+        .J          = (u64)M,
+        .K          = (u64)M, 
+        .iii        = (u64)t_i,
+        .jjj        = (u64)t_j,
+        .kkk        = (u64)t_k,
+        .tti        = (u64)div_rup(sim.cfg.I, t_i),
+        .ttj        = (u64)div_rup(sim.cfg.J, t_j),
+        .ttk        = (u64)div_rup(sim.cfg.K, t_k),
+    };
+
+    sim = initialize_simulator(&cfg);
 
     /////////////// Baseline configurations
 
@@ -431,15 +406,15 @@ int main(int argc, char *argv[]) {
         // EWH
         // Incorporate SeaCache into baseline
         puts("***************** SeaCache *******************");
-        printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, K, (J + jjj - 1) / jjj,
-               nzB / (K * ((J + jjj - 1) / jjj)));
+        printf("nnzB:%d  K:%d  J/TJ:%d  nzlB:%d\n", nzB, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+               nzB / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj)));
 
         adaptive_prefetch = 1;
         useVirtualTag = 1;
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         adaptive_prefetch = 0;
         useVirtualTag = 0;
@@ -456,7 +431,7 @@ int main(int argc, char *argv[]) {
         CACHEBLOCK = 16;
         CACHEBLOCKLOG = 4;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         fflush(stdout);
 
@@ -473,19 +448,19 @@ int main(int argc, char *argv[]) {
         setSET();
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
-        int newkkk = kkk;
-        int newttk = ttk;
+        int newkkk = sim.cfg.kkk;
+        int newttk = sim.cfg.ttk;
         // if can keep, just use current kkk
-        if (cachesize > kkk * 2) {
-            cachesize -= kkk * 2;
+        if (cachesize > sim.cfg.kkk * 2) {
+            cachesize -= sim.cfg.kkk * 2;
         } else {
             // if can't keep, use smaller kkk
             // (make kkk*2 to be half cachesize)
             newkkk = cachesize / 4;
-            newttk = (K + kkk - 1) / kkk;
-            cachesize -= kkk * 2;
+            newttk = (sim.cfg.K + sim.cfg.kkk - 1) / sim.cfg.kkk;
+            cachesize -= sim.cfg.kkk * 2;
         }
-        runTile(iii, jjj, newkkk, tti, newttk, ttj);
+        runTile(newkkk);
         // return to the default setting
         CACHEBLOCK = 16;
         CACHEBLOCKLOG = 4;
@@ -505,7 +480,7 @@ int main(int argc, char *argv[]) {
         CACHEBLOCK = 4;
         CACHEBLOCKLOG = 2;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         // return to the default setting
         CACHEBLOCK = 16;
@@ -533,7 +508,7 @@ int main(int argc, char *argv[]) {
         cacheScheme;
         cachesize = inputcachesize;
 
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(kkk);
         adaptive_prefetch = 0;
         useVirtualTag = 0;
         *****************************************/
@@ -553,7 +528,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -563,7 +538,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_MAPPING;
         cachesize = inputcachesize;
         setSET();
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -572,7 +547,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 6;
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
 
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 with virtue   "
              "!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -582,7 +557,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 6;
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
         useVirtualTag = 0;
 
         puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
@@ -590,7 +565,7 @@ int main(int argc, char *argv[]) {
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
         prefetchSize = cachesize / 16;
-        runTile(iii, jjj, kkk, tti, ttk, ttj);
+        runTile(sim.cfg.kkk);
         useVirtualTag = 0;
     }
 

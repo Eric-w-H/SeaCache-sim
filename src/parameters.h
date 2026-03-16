@@ -10,11 +10,6 @@ extern double samplep;
 // sample parameter k
 extern double samplek;
 
-extern int I, J, K;
-
-extern int tti, ttj, ttk;
-extern int iii, jjj, kkk;
-
 enum DataFlow {
     Inner, // 0
     Outer, // 1
@@ -45,9 +40,9 @@ extern string printFormat[10];
 extern int blockformat;
 extern int BSRsize;
 
-extern InterOrder interorder;
-extern DataFlow dataflow;
-extern Format format;
+const enum InterOrder interorder= IJK;
+const enum DataFlow dataflow    = Gust;
+const enum Format format        = RR;
 
 extern int Asize;
 extern int Bsize;
