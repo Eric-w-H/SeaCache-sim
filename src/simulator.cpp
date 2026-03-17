@@ -23,6 +23,8 @@ int *beginB = nullptr;
 int *beginAc = nullptr;
 int *beginBc = nullptr;
 
+u64 *dirtyC = NULL;
+
 // int *begin = nullptr;
 
 /*
@@ -48,7 +50,7 @@ update bufferedsize each time
 int *bufferedsizeB = nullptr;
 // int *bufferedsizeC = nullptr;
 
-int *tmpC = nullptr;
+u8 *tmpC = nullptr;
 
 // start of current block (NOTE(ejs): block == tile?)
 int TI, TJ, TK;
@@ -941,8 +943,8 @@ bool consistent_A() {
 }
 
 // ii here means the now access position for OPT policy
-void get_B_fiber(int jj, int ii) {
-
+void get_B_fiber(int jj, int ii)
+{
     // In Blocking Mode
     if (!ISCACHE) {
 
@@ -1032,7 +1034,7 @@ void get_A_fiber_col(int jj)
                                 sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
 
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-            // double A access in static FLRU scheme
+            // f64 A access in static FLRU scheme
             computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
             computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
 
@@ -1051,7 +1053,7 @@ void get_A_fiber(int ii) {
         computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
 
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-            // double A access in static FLRU scheme
+            // f64 A access in static FLRU scheme
             computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
         }
     } else {
@@ -1063,7 +1065,7 @@ void get_A_fiber(int ii) {
                                 sramWriteBandwidth(currsizeA[ii] * 3 + 2);
 
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-            // double A access in static FLRU scheme
+            // f64 A access in static FLRU scheme
             computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
             computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
 
@@ -1082,8 +1084,8 @@ void update_c_fiber(int jj) {
 
 // need to store: all the stored C coords,
 // in order to calculate the current and next state occuppied buffer size
-void updateCAccess(int ii) {
-
+void updateCAccess(int ii)
+{
     // for buffered C:
     if ((Csize >= 100.0) && ((interorder == IKJ) || (interorder == KIJ))) {
 
@@ -1158,96 +1160,180 @@ void updateCAccess(int ii) {
     }
 }
 
-void get_B_fibers(int ii) {
-    if (dataflow == Gust) {
-        int tmpj = beginA[ii];
-        int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
+void get_B_fibers(int ii)
+{
+    assert(LIKELY(dataflow == Gust));
+    int tmpj = beginA[ii];
+    int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
+    u64 ndirty = 0;
 
-        // tmpc = 0
-        for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
-            tmpC[k1] = 0;
-        }
+    while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
+        // coordinate of required B fiber
+        int jj = A[ii][tmpj];
 
-        while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
-            // coordinate of required B fiber
-            int jj = A[ii][tmpj];
+        u64 bsize   = currsizeB[jj];
 
-            get_B_fiber(jj, ii);
+        // >> get_B_fiber() inlined
+        // In Blocking Mode
+        if (!ISCACHE) {
 
-            computePE += currsizeB[jj];
-            elements_processed_since_last_adjustment += currsizeB[jj];
+            // two decisions: 1) consistent or not; 2) buffer or not (may bypass)
 
-            update_c_fiber(jj);
+            if (consistent_B()) {
+                i64 cost = bsize * 3 + 2;
+                // B[jj] is on the buffer
+                if (fulltagB == 0 || jj < fullB) {
+                    // hit!
+                    // different access with B format:
+                    // continuous or chained
+                    computeSramAccess   += sramReadBandwidth(cost);
 
-            tmpj++;
-        }
-
-        // update A access
-        if (consistent_A()) {
-
-            // A[ii] is on the buffer
-
-            // updated: add the interorder judge.
-            // totally can't reuse if not **K
-            if ((interorder == IJK || interorder == JIK)) {
-                if (fulltagA == 0 || ii < fullA) {
-                    // hit
-                    computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
-                    if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                        computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3);
-                    }
                 } else {
-                    computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                    computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                    AccessByte += (tmpj - beginA[ii]) * 3;
-
-                    computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
-                                         sramWriteBandwidth((tmpj - beginA[ii]) * 3);
-
-                    if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                        computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                        computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                        computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
-                                             sramWriteBandwidth((tmpj - beginA[ii]) * 3);
-                    }
+                    // B[jj] is not on the buffer, need to access dram
+                    // different access with B format
+                    // access one dram fiber all check all
+                    computeDramAccess   += memoryBandwidthPE(cost);
+                    computeB            += memoryBandwidthPE(cost);
+                    AccessByte          += cost;
                 }
             } else {
-                computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                AccessByte += (tmpj - beginA[ii]) * 3;
+                // hit part (chained)
+                computeSramAccess += sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[jj] + 3) / 4);
 
-                computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
-                                     sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+                // miss part (need to check every uncached)
 
-                if (cacheScheme == CACHE_SCHEME_INNER_SP) {
-                    computeDramAccess += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-                    computeA += memoryBandwidthPE((tmpj - beginA[ii]) * 3);
-
-                    computeSramAccess += sramReadBandwidth((tmpj - beginA[ii]) * 3) +
-                                         sramWriteBandwidth((tmpj - beginA[ii]) * 3);
+                if (fulltagB) {
+                    computeDramAccess   += (memoryBandwidthPE(3)) * ((long long)TK + sim.cfg.kkk - fullB);
+                    computeB            += (memoryBandwidthPE(3)) * (long long)((long long)TK + sim.cfg.kkk - fullB);
+                    AccessByte          += 3 * (long long)((long long)TK + sim.cfg.kkk - fullB);
                 }
             }
 
         } else {
+            // In cache Mode
+            // address in cache mode is : fiberid + (relative << bias)  where relative =
+            // (relative coordinate in fiber)/CACHEBLOCK
+            int fibersize = bsize * 3 + 1;
+            cacheAccessFiber(jj, fibersize, ii);
+        }
+        // << get_B_fiber inlined
 
-            // hit part (chained)
-            computeSramAccess +=
-                sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[ii] + 3) / 4);
+        computePE += bsize;
+        elements_processed_since_last_adjustment += bsize;
 
-            // miss part (need to check every uncached)
+        // >> update_c_fiber() inlined
+        for (int k1 = beginB[jj]; k1 < beginB[jj] + bsize; k1++) {
+            u64 index = B[jj][k1];
+            if (!tmpC[index]) {
+                dirtyC[ndirty++]= index;
+                tmpC[index]     = 1;
+            }
+        }
+        // << update_c_fiber() inlined
 
-            if (fulltagA) {
-                computeDramAccess +=
-                    (memoryBandwidthPE(3)) * ((long long)TJ + sim.cfg.jjj - fullA);
-                computeA +=
-                    (memoryBandwidthPE(3)) * (long long)((long long)TJ + sim.cfg.jjj - fullA);
-                AccessByte += 3 * ((long long)TJ + sim.cfg.jjj - fullA);
+        tmpj++;
+    }
+
+
+    // update A access
+    if (consistent_A()) {
+        i64 cost = (tmpj - beginA[ii]) * 3;
+        b32 hitA = (interorder == IJK || interorder == JIK) && (fulltagA == 0 || ii < fullA);
+
+        // A[ii] is on the buffer
+
+        // updated: add the interorder judge.
+        // totally can't reuse if not **K
+        if (hitA) {
+            // hit
+            computeSramAccess += sramReadBandwidth(cost);
+            if (cacheScheme == CACHE_SCHEME_INNER_SP)
+                computeSramAccess += sramReadBandwidth(cost);
+        } else {
+            computeDramAccess   += memoryBandwidthPE(cost);
+            computeA            += memoryBandwidthPE(cost);
+            AccessByte          += cost;
+            computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
+
+            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+                computeDramAccess   += memoryBandwidthPE(cost);
+                computeA            += memoryBandwidthPE(cost);
+                computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
             }
         }
 
-        // update C access
-        updateCAccess(ii);
+    } else {
+        // hit part (chained)
+        computeSramAccess   += sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[ii] + 3) / 4);
+
+        // miss part (need to check every uncached)
+        if (fulltagA) {
+            computeDramAccess   += (memoryBandwidthPE(3)) * ((long long)TJ + sim.cfg.jjj - fullA);
+            computeA            += (memoryBandwidthPE(3)) * (long long)((long long)TJ + sim.cfg.jjj - fullA);
+            AccessByte          += 3 * ((long long)TJ + sim.cfg.jjj - fullA);
+        }
     }
+
+    // >> updateCaccess() inlined
+    // for buffered C:
+    if ((Csize >= 100.0) && ((interorder == IKJ) || (interorder == KIJ))) {
+        int deltaC = 0;
+        for (u64 d = 0; d < ndirty; ++d) {
+            u64 k1 = dirtyC[d];
+            if (tmpC[k1]) {
+                if (bufferedC[ii].find(k1) == bufferedC[ii].end()) {
+                    ++deltaC;
+                    bufferedC[ii].insert(k1);
+                }
+            }
+        }
+        bufferedClen[ii]+= deltaC;
+        Csizenow        += deltaC;
+
+        // overflow! need to offload
+        if (Csizenow > Csize) {
+
+            // *2 because
+            // 1 is to write to dram
+            // 1 is to read from dram at the final merge stage
+            computeDramAccess   += memoryBandwidthPE(Csizenow * 3);
+            postDramAccess      += memoryBandwidthPE(Csizenow * 3);
+            // write C at compute stage; read C at post merge stage
+            computeC            += memoryBandwidthPE(Csizenow * 3);
+            postC               += memoryBandwidthPE(Csizenow * 3);
+            AccessByte          += Csizenow * 6;
+            computeSramAccess   += sramReadBandwidth(Csizenow * 3) + sramWriteBandwidth(Csizenow * 3);
+            Csizenow = 0;
+
+            for (int i = TI; i < TI + sim.cfg.iii; i++) {
+                bufferedC[i]    = std::set<int>();
+                bufferedClen[i] = 0;
+            }
+        }
+    } else {
+        // following is for the stream C
+        // update with compute
+
+        // write into DRAM during the computation
+        computeDramAccess += memoryBandwidthPE(ndirty * 3);
+        computeC += memoryBandwidthPE(ndirty * 3);
+        AccessByte += ndirty * 3;
+
+        if (sim.cfg.jjj != sim.cfg.J) {
+            // multiply 2 here if kkk != K
+            // because need a extra inter-tile C merge and thus need an extra load
+            postDramAccess += memoryBandwidthPE(ndirty * 3);
+            postC += memoryBandwidthPE(ndirty * 3);
+            AccessByte += ndirty * 3;
+        }
+
+        computeSramAccess +=
+            sramReadBandwidth(ndirty * 3) + sramWriteBandwidth(ndirty * 3);
+    }
+    // << updateCaccess() inlined
+
+    for (u64 d = 0; d < ndirty; d++)
+        tmpC[dirtyC[d]] = 0;
 }
 
 // prefetchSize: the size of the buffer allocated for prefetch
@@ -1309,8 +1395,8 @@ bool prefetchrow(int ii) {
 
             long long firstaddr = getCacheAddr(jj, 0);
             int fibersize = currsizeB[jj] * 3;
-            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHEBLOCK) {
-                long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHEBLOCK);
+            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NELEMS) {
+                long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NELEMS);
 
                 int _set = getSet2(tmpaddr);
                 int _tag = getTag2(tmpaddr);
@@ -1433,7 +1519,7 @@ bool prefetchrow(int ii) {
     return 1;
 }
 
-int get_num_samples(double current_temperature) {
+int get_num_samples(f64 current_temperature) {
 
     if (current_temperature > SA_INITIAL_TEMP * 0.5) {
         return 4;
@@ -1447,7 +1533,7 @@ int get_num_samples(double current_temperature) {
 bool lastaccept = 1;
 
 void update_prefetch_size() {
-    double temperature = SA_INITIAL_TEMP * pow(SA_COOLING_RATE, sa_iteration_k);
+    f64 temperature = SA_INITIAL_TEMP * pow(SA_COOLING_RATE, sa_iteration_k);
 
     int num_samples = get_num_samples(temperature);
 
@@ -1460,20 +1546,17 @@ void update_prefetch_size() {
     }
 
     if (lastaccept == 0) {
-        double current_data_miss_rate =
-            1.0 - ((double)(data_access_hit) / data_access_total);
+        f64 current_data_miss_rate =
+            1.0 - ((f64)(data_access_hit) / data_access_total);
         last_iteration_data_miss_rate = current_data_miss_rate;
         lastaccept = 1;
 
-        double current_discard_rate;
+        f64 current_discard_rate;
         if (prefetch_increments == 0) {
             current_discard_rate = 0;
         } else {
-            current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
+            current_discard_rate = ((f64)prefetch_discards) / prefetch_increments;
         }
-        // double current_no_counter_miss_rate = static_cast<double>(data_access_misses) / data_access_total;
-        // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
-        //        prefetch_discards, prefetch_increments);
 
         previous_prefetch_size = current_prefetch_size;
 
@@ -1487,8 +1570,8 @@ void update_prefetch_size() {
                 if (current_data_miss_rate >= 0.3 &&
                     current_discard_rate > RATE_THRESHOLD) {
 
-                    double perturbation =
-                        ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 0.2;
+                    f64 perturbation =
+                        ((static_cast<f64>(rand()) / RAND_MAX) - 0.5) * 0.2;
                     current_prefetch_size *= (1.0 + perturbation);
                 }
             }
@@ -1503,17 +1586,16 @@ void update_prefetch_size() {
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
         prefetch_increments = 0;
-        data_access_misses = 0;
         data_access_hit = 0;
         data_access_total = 0;
 
         return;
     }
 
-    double current_data_miss_rate =
-        1.0 - ((double)(data_access_hit) / data_access_total);
+    f64 current_data_miss_rate =
+        1.0 - ((f64)(data_access_hit) / data_access_total);
 
-    double delta_M = (double)((1.0 - last_iteration_data_miss_rate) -
+    f64 delta_M = (f64)((1.0 - last_iteration_data_miss_rate) -
                               (1.0 - current_data_miss_rate)) /
                      (1.0 - last_iteration_data_miss_rate);
 
@@ -1521,8 +1603,8 @@ void update_prefetch_size() {
     if (delta_M < 0) {
         accept_change = true;
     } else {
-        double acceptance_prob = exp(-delta_M / temperature);
-        double random_val = static_cast<double>(rand()) / RAND_MAX;
+        f64 acceptance_prob = exp(-delta_M / temperature);
+        f64 random_val = static_cast<f64>(rand()) / RAND_MAX;
         // printf("%lf %lf %lf\n", temperature, acceptance_prob, random_val);
         if (acceptance_prob > random_val) {
             accept_change = true;
@@ -1540,7 +1622,6 @@ void update_prefetch_size() {
         last_iteration_data_miss_rate = current_data_miss_rate;
         if (current_data_miss_rate < best_data_miss_rate) {
             best_data_miss_rate = current_data_miss_rate;
-            best_prefetch_size = current_prefetch_size;
         }
         lastaccept = 1;
     } else {
@@ -1553,23 +1634,18 @@ void update_prefetch_size() {
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
         prefetch_increments = 0;
-        data_access_misses = 0;
         data_access_hit = 0;
         data_access_total = 0;
 
         return;
     }
 
-    double current_discard_rate;
+    f64 current_discard_rate;
     if (prefetch_increments == 0) {
         current_discard_rate = 0;
     } else {
-        current_discard_rate = ((double)prefetch_discards) / prefetch_increments;
+        current_discard_rate = ((f64)prefetch_discards) / prefetch_increments;
     }
-    // double current_no_counter_miss_rate = static_cast<double>(data_access_misses) / data_access_total;
-    // printf("Discard Rate: %lf, %d %d \n", current_discard_rate,
-    // prefetch_discards,
-    //       prefetch_increments);
 
     previous_prefetch_size = current_prefetch_size;
 
@@ -1584,8 +1660,8 @@ void update_prefetch_size() {
             if (current_data_miss_rate >= 0.3 &&
                 current_discard_rate > RATE_THRESHOLD) {
 
-                double perturbation =
-                    ((static_cast<double>(rand()) / RAND_MAX) - 0.5) * 1.0;
+                f64 perturbation =
+                    ((static_cast<f64>(rand()) / RAND_MAX) - 0.5) * 1.0;
                 current_prefetch_size *= (1.0 + perturbation);
             }
         }
@@ -1600,7 +1676,6 @@ void update_prefetch_size() {
     elements_processed_since_last_adjustment = 0;
     prefetch_discards = 0;
     prefetch_increments = 0;
-    data_access_misses = 0;
     data_access_hit = 0;
     data_access_total = 0;
 }
@@ -1823,7 +1898,7 @@ void calculate() {
     totalPE += computePE / PEcnt;
 }
 
-void configPartial(float partialA, float partialB, float partialC) {
+void configPartial(f32 partialA, f32 partialB, f32 partialC) {
     Asize = cachesize * partialA;
     Bsize = cachesize * partialB;
     Csize = cachesize * partialC;
@@ -1862,7 +1937,9 @@ struct simulator_state initialize_simulator(const struct config *cfg)
             bufferedsizeB = new int[cfg->J]();
 
         if (tmpC == nullptr)
-            tmpC = new int[cfg->K]();
+            tmpC    = new u8[cfg->K]();
+        if (dirtyC == nullptr)
+            dirtyC  = new u64[cfg->K]();
 
         if (LFUtag == nullptr)
             LFUtag = new int[cfg->J]();
@@ -1900,11 +1977,10 @@ void reinitialize() {
         initializeCacheValid();
 
         if (useVirtualTag) {
-            memset(virtualValid, 0, sizeof(bool) * SET * VIRTUALSETASSOC);
+            memset(virtualValid, 0, sizeof(bool) * CACHE_NSETS * VIRTUALSETASSOC);
         }
 
-        memset(PosOrig, 0, sizeof(short) * SET * SETASSOC);
-        memset(vPosOrig, 0, sizeof(short) * SET * SETASSOC);
+        memset(PosOrig, 0, sizeof(short) * CACHE_NSETS * SETASSOC);
     }
 
     // reinitialize buffer c
@@ -2005,9 +2081,9 @@ void run()
     if (adaptive_prefetch) {
         // initialize adaptive prefetch
         // --- Offline Phase ---
-        // double avg_nonzero_length_B;
+        // f64 avg_nonzero_length_B;
         // if (K > 0 && T_J > 0) {
-        //   avg_nonzero_length_B = static_cast<double>(nnzB) / K;
+        //   avg_nonzero_length_B = static_cast<f64>(nnzB) / K;
         // } else {
         //   avg_nonzero_length_B = 1.0;
         // }
@@ -2020,7 +2096,6 @@ void run()
 
         sa_iteration_k = 0;
         previous_prefetch_size = current_prefetch_size;
-        best_prefetch_size = current_prefetch_size;
         last_iteration_data_miss_rate = 1.0;
         best_data_miss_rate = 1.0;
 
@@ -2031,7 +2106,6 @@ void run()
         elements_processed_since_last_adjustment = 0;
 
         prefetch_discards = 0;
-        data_access_misses = 0;
         data_access_hit = 0;
         data_access_total = 0;
     }
@@ -2143,8 +2217,8 @@ void runTile(int kkk)
     if ((cacheScheme == 4) || (cacheScheme == 5) || (cacheScheme == 7)) {
         // need to add back after this calculation
         cachesize = inputcachesize;
-        SET = cachesize / (CACHEBLOCK * SETASSOC);
-        SETLOG = getlog(SET);
+        CACHE_NSETS = cachesize / (CACHE_BLOCK_NELEMS * SETASSOC);
+        CACHE_NSETS_LOG2 = getlog(CACHE_NSETS);
     }
 
     hitcnt = 0;

@@ -27,13 +27,10 @@ extern struct Arena *global_persist;
 extern struct Arena *global_temp;
 extern struct simulator_state sim;
 
-extern int cachesize;
 extern int prefetchSize;
 extern bool adaptive_prefetch;
 
-extern int cacheScheme;
-
-void configPartial(float partialA, float partialB, float partialC);
+void configPartial(f32 partialA, f32 partialB, f32 partialC);
 void reinitialize();
 void runTile(int kkk);
 void run();

@@ -18,21 +18,21 @@ void getParameter()
     std::unique_ptr<map<int, bool>[]> estC;
     std::unique_ptr<int[]> endA, endB;
 
-    unordered_set<double> hashset;
-    priority_queue<double> hashqu;
+    unordered_set<f64> hashset;
+    priority_queue<f64> hashqu;
 
-    unordered_set<pair<double, int>, pair_hash> hashsetr;
-    priority_queue<pair<double, int>> hashqur;
+    unordered_set<pair<f64, int>, pair_hash> hashsetr;
+    priority_queue<pair<f64, int>> hashqur;
 
-    unordered_set<double> Fset;
-    unordered_set<pair<double, int>, pair_hash> Fsetr;
+    unordered_set<f64> Fset;
+    unordered_set<pair<f64, int>, pair_hash> Fsetr;
 
-    unordered_set<double> hashsetTJ[256];
-    priority_queue<double> hashquTJ[256];
+    unordered_set<f64> hashsetTJ[256];
+    priority_queue<f64> hashquTJ[256];
 
     long long estnnzC, nnzCTk[33];
 
-    vector<double> vectorTK[8195];
+    vector<f64> vectorTK[8195];
 
     try {
         estC = std::make_unique<map<int, bool>[]>(max(sim.cfg.I, sim.cfg.J));

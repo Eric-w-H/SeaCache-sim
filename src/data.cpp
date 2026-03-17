@@ -29,5 +29,5 @@ std::vector<u64> *SAc = nullptr; //  SAc[c]  = [hash1(r, ...)] x u (list of u co
 std::vector<u64> *SBc = nullptr; // SBc[c']  = [r_1, r_2, ..., r_v]
 std::vector<u64> *SB = nullptr;  // SB[r]    = [hash2(c, ...)] x v (list of v copies of same hash)
 
-extern double ha1, hb1;
-extern double ha2, hb2;
+extern f64 ha1, hb1;
+extern f64 ha2, hb2;

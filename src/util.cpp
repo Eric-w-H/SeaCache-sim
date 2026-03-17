@@ -13,11 +13,11 @@ int getlog(int x) {
 }
 
 // Hash function h1 and h2
-double hash1(int x, double a, double b, int pmod) {
-    // printf("%lf %lf\n", a*x+b, (double)(std::fmod(a * x + b, pmod)));
-    return (double)(std::fmod(a * x + b, pmod)) / pmod;
+f64 hash1(int x, f64 a, f64 b, int pmod) {
+    // printf("%lf %lf\n", a*x+b, (f64)(std::fmod(a * x + b, pmod)));
+    return (f64)(std::fmod(a * x + b, pmod)) / pmod;
 }
 
-double hash2(int x, double a, double b, int pmod) {
-    return (double)(std::fmod(a * x + b, pmod)) / pmod;
+f64 hash2(int x, f64 a, f64 b, int pmod) {
+    return (f64)(std::fmod(a * x + b, pmod)) / pmod;
 }

@@ -1,20 +1,20 @@
 #include "config.h"
 
-double HBMbandwidth;
+f64 HBMbandwidth;
 int PEcnt;
 int mergecnt;
-double HBMbandwidthperPE;
+f64 HBMbandwidthperPE;
 int sramBank;
 int sramReadPort;
 int sramWritePort;
 
 // DRAM bandwidth
-double memoryBandwidthWhole(long long ss) {
+f64 memoryBandwidthWhole(long long ss) {
     return (ss + HBMbandwidth - 1) / HBMbandwidth;
 }
 
 // bandwidth per PE
-double memoryBandwidthPE(long long ss) { return ss / HBMbandwidthperPE; }
+f64 memoryBandwidthPE(long long ss) { return ss / HBMbandwidthperPE; }
 
 /*
 Return the single port cycle. (Otherwise will lead to fractional)

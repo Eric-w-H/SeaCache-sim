@@ -1,3 +1,9 @@
+/*
+NOTE: For regression checking, check against branch "main_with_indexing_fix"
+(specifically, commit: e8f2d9bac4bbf0ad0619930dbdd54d089d9cb351).
+
+This branch fixes a "read one past end of array allocation" bug for offsetarrayA/Ac/B/Bc.
+*/
 #include "arena.h"
 #include <stdlib.h>
 #include "cache.h"
@@ -11,12 +17,12 @@
 struct Arena *global_persist;
 struct Arena *global_temp;
 struct simulator_state sim;
+struct cache cache;
 
 using json = nlohmann::json;
 
 struct matrix {
-    const char *mat_name;
-    i16 transpose;
+    b16 transpose;
 
     u64 nrows;
     u64 ncols;
@@ -48,19 +54,16 @@ void parse_matrix(FILE *f, struct matrix *x)
 {
     struct Arena_Mark mark = arena_snap(global_temp);
 
-    i16 transpose = x->transpose;
+    b16 transpose = x->transpose;
 
     // Lines limited to 1024 characters by spec
     #define BUFFER_NBYTES (u64)1024
     char readbuffer[BUFFER_NBYTES];
 
-    // void *arena_push(struct Arena *a, uint64_t size, uint64_t align, uint8_t zero)
-    // u64 total_nbytes    = sizeof(u64)*x->nzM;
-    u64 *raw_rows, *raw_cols, *flat_indices;
+    u64 *raw_rows, *raw_cols;
     struct kv *kvs;
     raw_rows        = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
     raw_cols        = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
-    flat_indices    = (u64 *)arena_push(global_temp, x->nzM*sizeof(*flat_indices), __alignof__(*flat_indices), 0);
     kvs             = (struct kv *)arena_push(global_temp, x->nzM*sizeof(*kvs), __alignof__(*kvs), 0);
     u64 *row_lens   = (u64 *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
     u64 *col_lens   = (u64 *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
@@ -88,7 +91,7 @@ void parse_matrix(FILE *f, struct matrix *x)
         }
 
         int xx, yy;
-        // double zz, lala;
+        // f64 zz, lala;
 
         /* NOTE(ejs): Each mtx row is a matrix entry.
         xx, yy [zz, lala]
@@ -196,6 +199,7 @@ int main(int argc, char *argv[])
 
     global_persist  = arena_alloc(16*GB, MB);
     global_temp     = arena_alloc(16*GB, MB);
+    cache.backing   = arena_alloc(16*GB, MB);
 
     std::string matrix1_name    = argv[1];
     std::string matrix2_name    = argv[2];
@@ -211,8 +215,8 @@ int main(int argc, char *argv[])
     file >> config;
 
     int transpose           = config["transpose"].get<int>();
-    float tmpsram           = config["cachesize"].get<float>();
-    float tmpbandw          = config["memorybandwidth"].get<float>();
+    f32 tmpsram             = config["cachesize"].get<f32>();
+    f32 tmpbandw            = config["memorybandwidth"].get<f32>();
     int baselinetest        = config["baselinetest"].get<int>();
     bool condensedOP        = config["condensedOP"].get<bool>();
     std::string tile_dir    = config["tileDir"].get<std::string>();
@@ -227,17 +231,28 @@ int main(int argc, char *argv[])
     HBMbandwidthperPE = HBMbandwidth / PEcnt;
     int tmpbank = config["srambank"].get<int>();
     sramBank = tmpbank;
-    ISCACHE = 1;
 
     std::string matrix1_filepath = "data/" + matrix1_name + ".mtx";
     std::string matrix2_filepath = "data/" + matrix2_name + ".mtx";
-    FILE *matrix1_file = fopen(matrix1_filepath.c_str(), "r");
-    FILE *matrix2_file = fopen(matrix2_filepath.c_str(), "r");
+    std::string output_filepath = output_dir
+        +   (1 ? "C" : "_") // +   (ISCACHE ? "C" : "_")
+        +   printDataFlow[dataflow]
+        +   (baselinetest ? "Base_" : "570Cache_")
+        +   std::to_string(tmpsram)
+        +   "MB_" + std::to_string(tmpbandw)
+        +   "GBs_" + std::to_string(tmpPE)
+        +   "PEs_" + std::to_string(tmpbank) + "sbanks_"
+        +   "_" + matrix1_name + "_" + matrix2_name + "_"
+        +   printFormat[format] + "_" + (transpose ? "1" : "0") + ".txt";
+
+    FILE *matrix1_file  = fopen(matrix1_filepath.c_str(), "r");
+    FILE *matrix2_file  = fopen(matrix2_filepath.c_str(), "r");
     assert(matrix1_file);
     assert(matrix2_file);
+    assert(freopen(output_filepath.c_str(), "w", stdout));
 
-    struct matrix matA = {.mat_name="A"};
-    struct matrix matB = {.mat_name="B"};
+    struct matrix matA = {0};
+    struct matrix matB = {0};
     {
         #define TEMP_BUFFER_NBYTES 1024
         char buf[TEMP_BUFFER_NBYTES];
@@ -257,8 +272,8 @@ int main(int argc, char *argv[])
         sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
-    matA.transpose = (i16)transpose;
-    matB.transpose = (i16)((matB.nrows == matB.ncols) ? transpose : !transpose);
+    matA.transpose = (b16)transpose;
+    matB.transpose = (b16)((matB.nrows == matB.ncols) ? transpose : !transpose);
     if (matA.transpose)
         swap(matA.ncols, matA.nrows);
     if (matB.transpose)
@@ -292,20 +307,6 @@ int main(int argc, char *argv[])
         .ttk        = div_rup(matB.ncols, t_k),
     };
     sim = initialize_simulator(&cfg);
-
-
-    if (!freopen((output_dir + (ISCACHE ? "C" : "_") + printDataFlow[dataflow] +
-                  (baselinetest ? "Base_" : "570Cache_") +
-                  std::to_string(tmpsram) + "MB_" + std::to_string(tmpbandw) +
-                  "GBs_" + std::to_string(tmpPE) + "PEs_" +
-                  std::to_string(tmpbank) + "sbanks_" + "_" + matrix1_name + "_" +
-                  matrix2_name + "_" + printFormat[format] + "_" +
-                  (transpose ? "1" : "0") + ".txt")
-                     .c_str(),
-                 "w", stdout)) {
-        std::cerr << "Error opening output folder." << std::endl;
-        return 1;
-    }
 
     parse_matrix(matrix1_file, &matA);
     A   = matA.M;
@@ -370,17 +371,13 @@ int main(int argc, char *argv[])
     offsetarrayB = matB.offsetarrayM;
     offsetarrayBc= matB.offsetarrayMc;
 
-    if (ISCACHE == 1) {
-        setSET();
-    }
-
     /******************Config************************************/
 
     printf("Matrix A: %llu x %llu, number of non-zeros = %llu\n", matA.nrows, matA.ncols, matA.nzM);
     printf("*** ratio of empty %lf, ratio of not empty %lf\n", totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
-    printf("*** ratio of in cache %lf\n", totalincache / ((double)matA.nzM));
-    printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch48));
-    printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((double)sim.cfg.I + totaltagmatch16));
+    printf("*** ratio of in cache %lf\n", totalincache / ((f64)matA.nzM));
+    printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch48));
+    printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch16));
     printf("Matrix B: %llu x %llu, number of non-zeros = %llu\n", matB.nrows, matB.ncols, matB.nzM);
     printf("transpose: %d\n", matB.transpose);
     printf("I = %llu, K = %llu, J = %llu\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
@@ -401,6 +398,18 @@ int main(int argc, char *argv[])
             matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
         );
 
+        ISCACHE = 1;
+        cachesize               = 262144;
+        CACHE_BLOCK_NELEMS      = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
+        setSET();
+
+        cache.cfg = {
+            .block_nelems       = 1,
+            .block_nelems_log2  = 1,
+            .scheme             = CACHE_SCHEME_FLFU,
+        };
+
         adaptive_prefetch = 1;
         useVirtualTag = 1;
         cacheScheme = CACHE_SCHEME_FLFU;
@@ -420,8 +429,8 @@ int main(int argc, char *argv[])
         prefetchSize = inputcachesize / 6;
         cacheScheme = CACHE_SCHEME_INNER_SP;
         cachesize = inputcachesize;
-        CACHEBLOCK = 16;
-        CACHEBLOCKLOG = 4;
+        CACHE_BLOCK_NELEMS = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = 4;
         setSET();
         runTile(sim.cfg.kkk);
 
@@ -433,8 +442,8 @@ int main(int argc, char *argv[])
         cacheScheme = CACHE_SCHEME_SPARCH;
         prefetchSize = inputcachesize / 6;
         cachesize = inputcachesize - prefetchSize;
-        CACHEBLOCK = 144;
-        CACHEBLOCKLOG = 8;
+        CACHE_BLOCK_NELEMS = 144;
+        CACHE_BLOCK_NELEMS_LOG2 = 8;
         setSET();
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
@@ -452,8 +461,8 @@ int main(int argc, char *argv[])
         }
         runTile(newkkk);
         // return to the default setting
-        CACHEBLOCK = 16;
-        CACHEBLOCKLOG = 4;
+        CACHE_BLOCK_NELEMS = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = 4;
         cachesize = inputcachesize;
         setSET();
 
@@ -465,14 +474,14 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
-        CACHEBLOCK = 4;
-        CACHEBLOCKLOG = 2;
+        CACHE_BLOCK_NELEMS = 4;
+        CACHE_BLOCK_NELEMS_LOG2 = 2;
         setSET();
         runTile(sim.cfg.kkk);
 
         // return to the default setting
-        CACHEBLOCK = 16;
-        CACHEBLOCKLOG = 4;
+        CACHE_BLOCK_NELEMS = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = 4;
         setSET();
 
         puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");

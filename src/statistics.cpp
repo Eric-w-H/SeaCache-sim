@@ -45,5 +45,5 @@ void analyze_statistics() {
     printf("total DRAM access A = %lld, total DRAM access B = %lld, "
            "total DRAM access C = %lld \n",
            totalA, totalB, totalC);
-    printf("hitrate = %lf  \n", (totalhit) / ((double)totalaccess));
+    printf("hitrate = %lf  \n", (totalhit) / ((f64)totalaccess));
 }
