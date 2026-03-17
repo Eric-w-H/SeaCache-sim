@@ -27,9 +27,11 @@ typedef int16_t     i16;
 typedef int8_t      i8;
 typedef double      f64;
 typedef float       f32;
-typedef i32         b32;
-typedef i16         b16;
-typedef i8          b8;
+typedef int32_t     b32;
+typedef int16_t     b16;
+typedef int8_t      b8;
+
+typedef uint32_t    Coord;
 
 
 #define div_rup(a, b)   (((a) + (b) - 1) / (b)) // round-up integer divide, uint over non-zero uint

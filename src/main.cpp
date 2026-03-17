@@ -24,24 +24,21 @@ using json = nlohmann::json;
 struct matrix {
     b16 transpose;
 
-    u64 nrows;
-    u64 ncols;
-    u64 nzM;    // number of non-zero elements
+    Coord nrows;
+    Coord ncols;
+    Coord nzM;    // number of non-zero elements
 
-    u64 *M_backing;
-    u64 *Mc_backing;
+    Coord *M_backing;
+    Coord *Mc_backing;
 
-    u64 **M,
-        **Mc;
-    u64
-        *offsetarrayM,
-        *offsetarrayMc;
+    Coord **M, **Mc;
+    Coord *offsetarrayM, *offsetarrayMc;
 };
 
-i32 cmp_u64(const void *a, const void *b)
+i32 cmp_coord(const void *a, const void *b)
 {
-    u64 x = *(const u64 *)a;
-    u64 y = *(const u64 *)b;
+    Coord x = *(const Coord *)a;
+    Coord y = *(const Coord *)b;
     return (x > y) - (x < y);
 }
 
@@ -55,20 +52,20 @@ void parse_matrix(FILE *f, struct matrix *x)
     #define BUFFER_NBYTES (u64)1024
     char readbuffer[BUFFER_NBYTES];
 
-    u64 *raw_rows   = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
-    u64 *raw_cols   = (u64 *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
-    u64 *row_lens   = (u64 *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
-    u64 *col_lens   = (u64 *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
-    u64 *offsets;
+    Coord *raw_rows = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
+    Coord *raw_cols = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
+    Coord *row_lens = (Coord *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
+    Coord *col_lens = (Coord *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
+    Coord *offsets;
 
-    x->M_backing    = (u64 *)arena_push(global_persist, x->nzM*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
-    x->Mc_backing   = (u64 *)arena_push(global_persist, x->nzM*sizeof(*x->Mc_backing), __alignof__(*x->Mc_backing), 0);
-    x->M            = (u64 **)arena_push(global_persist, (x->nrows+1)*sizeof(*x->M), __alignof__(*x->M), 0);
-    x->Mc           = (u64 **)arena_push(global_persist, (x->ncols+1)*sizeof(*x->Mc), __alignof__(*x->Mc), 0);
-    x->offsetarrayM = (u64 *)arena_push(global_persist, (x->nrows+1)*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
-    x->offsetarrayMc= (u64 *)arena_push(global_persist, (x->ncols+1)*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
+    x->M_backing    = (Coord *)arena_push(global_persist, x->nzM*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
+    x->Mc_backing   = (Coord *)arena_push(global_persist, x->nzM*sizeof(*x->Mc_backing), __alignof__(*x->Mc_backing), 0);
+    x->M            = (Coord **)arena_push(global_persist, (x->nrows+1)*sizeof(*x->M), __alignof__(*x->M), 0);
+    x->Mc           = (Coord **)arena_push(global_persist, (x->ncols+1)*sizeof(*x->Mc), __alignof__(*x->Mc), 0);
+    x->offsetarrayM = (Coord *)arena_push(global_persist, (x->nrows+1)*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
+    x->offsetarrayMc= (Coord *)arena_push(global_persist, (x->ncols+1)*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
 
-    for (u64 i = 0; i < x->nzM; ++i) {
+    for (Coord i = 0; i < x->nzM; ++i) {
         /* NOTE(ejs): Each mtx row is a matrix entry.
         xx, yy [zz, lala]
             - xx  = row index
@@ -77,14 +74,18 @@ void parse_matrix(FILE *f, struct matrix *x)
             - lala= imag. component of value? (ignored)
         */
         assert(fgets(readbuffer, BUFFER_NBYTES, f));
-        u64 xx, yy;
+        Coord xx, yy;
         // f64 zz, lala;
-        // assert(sscanf(readbuffer, "%llu %llu %lf %lf", &xx, &yy, &zz, &lala) >= 2);
-        assert(sscanf(readbuffer, "%llu %llu", &xx, &yy) == 2);
+        // assert(sscanf(readbuffer, "%lu %lu %lf %lf", &xx, &yy, &zz, &lala) >= 2);
+        static_assert(sizeof(Coord) == sizeof(u64) || sizeof(Coord) == sizeof(u32), "unsupported Coord size");
+        switch (sizeof(Coord)) {
+        case sizeof(u64): assert(sscanf(readbuffer, "%llu %llu", &xx, &yy) == 2);   break;
+        case sizeof(u32): assert(sscanf(readbuffer, "%u %u", &xx, &yy) == 2);       break;
+        }
 
         // WARNING(ejs): mtx indices are stored 1-based; it converts 0-based representation in code
-        u64 row_index = xx-1;
-        u64 col_index = yy-1;
+        Coord row_index = xx-1;
+        Coord col_index = yy-1;
         if (transpose)
             swap(row_index, col_index);
         raw_rows[i] = row_index;
@@ -97,45 +98,45 @@ void parse_matrix(FILE *f, struct matrix *x)
     // prefix sum
     offsets = x->offsetarrayM;
     offsets[0] = 0;
-    for (u64 i = 0; i < x->nrows; ++i)
+    for (Coord i = 0; i < x->nrows; ++i)
         offsets[i+1] = offsets[i] + row_lens[i];
 
     // scatter cols into row-major order (reuse row_lens as cursor)
     memset(row_lens, 0, x->nrows * sizeof(*row_lens));
-    for (u64 i = 0; i < x->nzM; ++i) {
-        u64 r = raw_rows[i];
-        u64 pos = offsets[r] + row_lens[r]++;
+    for (Coord i = 0; i < x->nzM; ++i) {
+        Coord r = raw_rows[i];
+        Coord pos = offsets[r] + row_lens[r]++;
         x->M_backing[pos] = raw_cols[i];
     }
 
     // sort within each row by column
-    for (u64 r = 0; r < x->nrows; ++r) {
-        u64 *base = x->M_backing + offsets[r];
-        qsort(base, row_lens[r], sizeof(*base), cmp_u64);
+    for (Coord r = 0; r < x->nrows; ++r) {
+        Coord *base = x->M_backing + offsets[r];
+        qsort(base, row_lens[r], sizeof(*base), cmp_coord);
     }
     
     // build csr pointers
-    for (u64 i = 0; i < x->nrows; ++i)
+    for (Coord i = 0; i < x->nrows; ++i)
         x->M[i] = x->M_backing + offsets[i];
     x->M[x->nrows] = x->M_backing + x->offsetarrayM[x->nrows];
 
     // csc
     offsets = x->offsetarrayMc;
     offsets[0] = 0;
-    for (u64 i = 0; i < x->ncols; ++i)
+    for (Coord i = 0; i < x->ncols; ++i)
         offsets[i+1] = offsets[i] + col_lens[i];
 
     memset(col_lens, 0, x->ncols * sizeof(*col_lens));
-    for (u64 i = 0; i < x->nzM; ++i) {
-        u64 c = raw_cols[i];
-        u64 pos = offsets[c] + col_lens[c]++;
+    for (Coord i = 0; i < x->nzM; ++i) {
+        Coord c = raw_cols[i];
+        Coord pos = offsets[c] + col_lens[c]++;
         x->Mc_backing[pos] = raw_rows[i];
     }
-    for (u64 c = 0; c < x->ncols; ++c) {
-        u64 *base = x->Mc_backing + offsets[c];
-        qsort(base, col_lens[c], sizeof(*base), cmp_u64);
+    for (Coord c = 0; c < x->ncols; ++c) {
+        Coord *base = x->Mc_backing + offsets[c];
+        qsort(base, col_lens[c], sizeof(*base), cmp_coord);
     }
-    for (u64 i = 0; i < x->ncols; ++i)
+    for (Coord i = 0; i < x->ncols; ++i)
         x->Mc[i] = x->Mc_backing + offsets[i];
     x->Mc[x->ncols] = x->Mc_backing + x->offsetarrayMc[x->ncols];
 
@@ -236,7 +237,7 @@ int main(int argc, char *argv[])
 
     FILE *tile_file = fopen((tile_dir + matrix1_name).c_str(), "r");
     assert(tile_file);
-    u64 t_i, t_j, t_k;
+    Coord t_i, t_j, t_k;
     {
         #define TEMP_BUFFER_NBYTES 1024
         char buf[TEMP_BUFFER_NBYTES];
@@ -309,7 +310,7 @@ int main(int argc, char *argv[])
     long long totaltagmatch16 = 0;
 
     for (int i = 1; i < sim.cfg.I; i++) {
-        u64 size_im1 = offsetarrayA[i] - offsetarrayA[i-1];
+        Coord size_im1 = offsetarrayA[i] - offsetarrayA[i-1];
         if (size_im1 < 48) {
             totalempty += (48 - size_im1);
         }

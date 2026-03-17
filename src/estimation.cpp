@@ -17,24 +17,24 @@ void getParameter()
 {
     struct Arena_Mark mark = arena_snap(global_temp);
     b8  *seen;
-    u64 *dirty;
+    Coord *dirty;
     seen = (b8 *)arena_push(global_temp, sim.cfg.K*sizeof(*seen), __alignof__(*seen), 1);
-    dirty= (u64*)arena_push(global_temp, sim.cfg.K*sizeof(*dirty), __alignof__(*dirty), 0);
+    dirty= (Coord*)arena_push(global_temp, sim.cfg.K*sizeof(*dirty), __alignof__(*dirty), 0);
 
     estEffMAC   = 0;
     u64 estnnzC = 0;
 
-    for (u64 i = 0; i < sim.cfg.I; ++i) {
-        u64 lenA = offsetarrayA[i+1] - offsetarrayA[i];
-        u64 ndirty = 0;
+    for (Coord i = 0; i < sim.cfg.I; ++i) {
+        Coord lenA = offsetarrayA[i+1] - offsetarrayA[i];
+        Coord ndirty = 0;
 
-        for (u64 j = 0; j < lenA; ++j) {
-            u64 tmpx = A[i][j];
-            u64 lenB = offsetarrayB[tmpx+1] - offsetarrayB[tmpx];
+        for (Coord j = 0; j < lenA; ++j) {
+            Coord tmpx = A[i][j];
+            Coord lenB = offsetarrayB[tmpx+1] - offsetarrayB[tmpx];
             estEffMAC += lenB;
 
-            for (u64 k = 0; k < lenB; ++k) {
-                u64 tmpk = B[tmpx][k];
+            for (Coord k = 0; k < lenB; ++k) {
+                Coord tmpk = B[tmpx][k];
                 if (!seen[tmpk]) {
                     seen[tmpk]      = 1;
                     dirty[ndirty++] = tmpk;
@@ -43,7 +43,7 @@ void getParameter()
         }
 
         estnnzC += ndirty;
-        for (u64 d = 0; d < ndirty; d++)
+        for (Coord d = 0; d < ndirty; d++)
             seen[dirty[d]] = 0;
     }
 

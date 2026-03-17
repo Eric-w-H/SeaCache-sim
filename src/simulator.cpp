@@ -23,7 +23,7 @@ int *beginB = nullptr;
 int *beginAc = nullptr;
 int *beginBc = nullptr;
 
-u64 *dirtyC = NULL;
+Coord *dirtyC = NULL;
 
 // int *begin = nullptr;
 
@@ -1129,13 +1129,13 @@ void get_B_fibers(int ii)
     assert(LIKELY(dataflow == Gust));
     int tmpj = beginA[ii];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
-    u64 ndirty = 0;
+    Coord ndirty = 0;
 
     while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
         // coordinate of required B fiber
         int jj = A[ii][tmpj];
 
-        u64 bsize   = currsizeB[jj];
+        Coord bsize   = currsizeB[jj];
 
         // >> get_B_fiber() inlined
         // In Blocking Mode
@@ -1187,7 +1187,7 @@ void get_B_fibers(int ii)
 
         // >> update_c_fiber() inlined
         for (int k1 = beginB[jj]; k1 < beginB[jj] + bsize; k1++) {
-            u64 index = B[jj][k1];
+            Coord index = B[jj][k1];
             if (!tmpC[index]) {
                 dirtyC[ndirty++]= index;
                 tmpC[index]     = 1;
@@ -1242,8 +1242,8 @@ void get_B_fibers(int ii)
     // for buffered C:
     if ((Csize >= 100.0) && ((interorder == IKJ) || (interorder == KIJ))) {
         int deltaC = 0;
-        for (u64 d = 0; d < ndirty; ++d) {
-            u64 k1 = dirtyC[d];
+        for (Coord d = 0; d < ndirty; ++d) {
+            Coord k1 = dirtyC[d];
             if (tmpC[k1]) {
                 if (bufferedC[ii].find(k1) == bufferedC[ii].end()) {
                     ++deltaC;
@@ -1296,7 +1296,7 @@ void get_B_fibers(int ii)
     }
     // << updateCaccess() inlined
 
-    for (u64 d = 0; d < ndirty; d++)
+    for (Coord d = 0; d < ndirty; d++)
         tmpC[dirtyC[d]] = 0;
 }
 
@@ -1901,7 +1901,7 @@ struct simulator_state initialize_simulator(const struct config *cfg)
         if (tmpC == nullptr)
             tmpC    = new u8[cfg->K]();
         if (dirtyC == nullptr)
-            dirtyC  = new u64[cfg->K]();
+            dirtyC  = new Coord[cfg->K]();
 
         if (LFUtag == nullptr)
             LFUtag = new int[cfg->J]();

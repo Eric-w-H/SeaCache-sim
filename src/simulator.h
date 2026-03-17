@@ -6,16 +6,16 @@ struct config {
     enum InterOrder interorder;
     enum Format     format;
 
-    u64 I, // num rows in A
-        J, // num cols in A, equiv. num rows in B
-        K; // num cols in B
-    u64 tti,
-        ttj,
-        ttk;
+    Coord   I, // num rows in A
+            J, // num cols in A, equiv. num rows in B
+            K; // num cols in B
+    Coord   tti,
+            ttj,
+            ttk;
     // block (tile?) size
-    u64 iii,
-        jjj,
-        kkk;
+    Coord   iii,
+            jjj,
+            kkk;
 };
 
 struct simulator_state {
