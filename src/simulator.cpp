@@ -5,12 +5,6 @@
 #include "headers.h"
 #include "statistics.h"
 
-// >> from dynamic.cpp
-int Tcnt[2][2];
-long long sizejksum[10];
-int tilesum;
-// <<
-
 // store all the buffered C now
 set<int> *bufferedC = nullptr;
 // record length of buffered C
@@ -137,6 +131,95 @@ void updateBlockB() {
         break;
     }
 
+}
+
+void compute_tile_luts(struct tile *t, b16 reset_begins)
+{
+    Coord   major_dim, minor_dim, major_idx, minor_idx;
+    const Coord *offsets, **map;
+    Coord *begins, *sizes;
+    major_dim   = t->major_dim;
+    minor_dim   = t->minor_dim;
+    major_idx   = *t->major_tile_idx * t->major_dim;
+    minor_idx   = *t->minor_tile_idx * t->minor_dim;
+    map         = t->map;
+    offsets     = t->offsets;
+    begins      = t->begins;
+    sizes       = t->sizes;
+
+    memset(sizes, 0, major_dim*sizeof(*sizes));
+    if (reset_begins)
+        memset(begins, 0, major_dim*sizeof(*sizes));
+
+    Coord abs_rj_lim= minor_idx + minor_dim;
+    for (Coord ri = 0; ri < major_dim; ++ri) {
+        Coord abs_ri        = major_idx + ri;
+        Coord nzero_elem_cnt= offsets[abs_ri+1] - offsets[abs_ri];
+
+        Coord rj        = begins[ri];
+        while (rj < nzero_elem_cnt && map[abs_ri][rj] < minor_idx)
+            ++rj;
+        begins[ri] = rj;
+        while (rj < nzero_elem_cnt && map[abs_ri][rj] < abs_rj_lim) {
+            ++sizes[ri];
+            ++rj;
+        }
+    }
+}
+
+void advance_cursor() // / tile pair
+{
+    struct cursor *c= &sim.cursor;
+    b16 first = (c->ti == 0) && (c->tj == 0) && (c->tk == 0);
+    // b16 A_need_recompute
+
+    // increment tile indices and check if either tile needs recomputing
+    b16 Atile_need_recompute, A_reset_begins;
+    b16 Btile_need_recompute, B_reset_begins;
+    
+    {
+        Coord old_A_major_tile_idx = *c->A.major_tile_idx;
+        Coord old_A_minor_tile_idx = *c->A.minor_tile_idx;
+        Coord old_B_major_tile_idx = *c->B.major_tile_idx;
+        Coord old_B_minor_tile_idx = *c->B.minor_tile_idx;
+        {
+            Coord   inner_p1    = *c->inner_tile_idx + 1;
+            Coord   middle_p1   = *c->middle_tile_idx + 1;
+            b16 inner_at_lim    = inner_p1 == c->inner_ntiles;
+            b16 middle_at_lim   = middle_p1 == c->middle_ntiles;
+            *c->inner_tile_idx  = inner_at_lim ? 0 : inner_p1;
+            *c->middle_tile_idx = inner_at_lim ? (middle_at_lim ? 0 : middle_p1) : *c->middle_tile_idx;
+            *c->outer_tile_idx  += (inner_at_lim && middle_at_lim);
+
+            *c->inner_wrap      = inner_at_lim;
+            *c->middle_wrap     = inner_at_lim && middle_at_lim;
+            *c->outer_wrap      = 0; // outer never wraps
+        }
+        Atile_need_recompute=
+            first
+        ||  (old_A_major_tile_idx != *c->A.major_tile_idx)
+        ||  (old_A_minor_tile_idx != *c->A.minor_tile_idx);
+
+        Btile_need_recompute=
+            first
+        ||  (old_B_major_tile_idx != *c->B.major_tile_idx)
+        ||  (old_B_minor_tile_idx != *c->B.minor_tile_idx);
+
+        A_reset_begins =
+            first
+        ||  *c->A.minor_wrap
+        ||  (old_A_major_tile_idx != *c->A.major_tile_idx);
+        B_reset_begins =
+            first
+        ||  *c->B.minor_wrap
+        ||  (old_B_major_tile_idx != *c->B.major_tile_idx);
+    }
+    
+
+    if (Atile_need_recompute)
+        compute_tile_luts(&c->A, A_reset_begins);
+    if (Btile_need_recompute)
+        compute_tile_luts(&c->B, B_reset_begins);
 }
 
 // each time after update TJ
@@ -656,10 +739,6 @@ void pre_load_B() {
 
                 int tmpsize = (tmpk - startk);
 
-                // update dynamic tile
-                Tcnt[_TJ][0] += halfk - startk;
-                Tcnt[_TJ][1] += tmpk  - halfk;
-
                 if (Bsizenow + tmpsize * 3 >= Bsize) {
                     if (!fulltagB) {
                         fulltagB = 1;
@@ -1058,7 +1137,7 @@ void updateCAccess(int ii)
         int deltaC = 0;
         // int oldsize = bufferedClen[ii];
         for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
-            if (tmpC[k1]) {
+            if (tmpC[k1]) { // FIXME: use bit vectors
                 // the k1 is a new element
                 if (bufferedC[ii].find(k1) == bufferedC[ii].end()) {
                     deltaC++;
@@ -2077,11 +2156,6 @@ void run()
     if (sim.cfg.kkk > sim.cfg.K)
         sim.cfg.kkk = sim.cfg.K;
 
-    // initialize Tcnt before each tile running
-    memset(Tcnt, 0, sizeof(Tcnt));
-    memset(sizejksum, 0, sizeof(sizejksum));
-    tilesum = 0;
-
     // reinitialize**: TI/TJ/TK to 0;  put beginA/B to 0
     reinitialize_outer();
     do {
@@ -2092,12 +2166,8 @@ void run()
 
             reinitialize_inner();
             do {
-                // initial dynamic tile
-                tilesum++;
-                memset(Tcnt, 0, sizeof(Tcnt));
-
                 // need to initialize the cache each time change the tile
-                if (ISCACHE) {
+                if (ISCACHE) { // FIXME(ejs): seems redundant and slow
                     initializeCacheValid();
                 }
 

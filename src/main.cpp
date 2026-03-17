@@ -143,6 +143,64 @@ void parse_matrix(FILE *f, struct matrix *x)
     arena_rewind(mark);
 }
 
+// struct matrix_tiling_config {
+//     struct Arena *a;
+//     Coord major_dim;
+//     Coord minor_dim;
+//     Coord minor_tile_dim;
+//     Coord **map;    // compressed sparse <axis> table
+//     Coord *offsets;
+// };
+// struct matrix_tiling_luts {
+//     Coord   **begins;
+//     Coord   **sizes;
+// };
+
+// struct matrix_tiling_luts
+// create_tiling_luts(const struct matrix_tiling_config *cfg)
+// {
+//     Coord   major_dim, minor_dim, minor_tile_dim, minor_ntiles;
+//     Coord   *offsets, **map;
+//     major_dim       = cfg->major_dim;
+//     minor_dim       = cfg->minor_dim;
+//     minor_tile_dim  = cfg->minor_tile_dim;
+//     minor_ntiles    = div_rup(minor_dim, minor_tile_dim);
+//     offsets         = cfg->offsets;
+//     map             = cfg->map;
+
+//     Coord begins[major_dim][minor_ntiles+1] = (Coord **)arena_push(cfg->a, major_dim*(minor_ntiles+1)*sizeof(**begins), __alignof__(**begins), 0);
+//     Coord sizes[major_dim][minor_ntiles]    = (Coord **)arena_push(cfg->a, major_dim*(minor_ntiles+1)*sizeof(**begins), __alignof__(**begins), 0);
+//     // sizes           = (Coord **)arena_push(cfg->a, major_dim*minor_tile_dim*sizeof(**sizes), __alignof__(**sizes), 1);
+//     printf("begins: %p\n", begins);
+//     printf("sizes: %p\n", sizes);
+//     fflush(stdout);
+
+//     for (Coord ri = 0; ri < major_dim; ++ri) {
+//         Coord nzero_elem_cnt= offsets[ri+1] - offsets[ri];
+//         Coord wj_tile_base  = 0;
+//         Coord wj            = 0;
+//         begins[ri][0]       = 0;
+//         for (Coord rj = 0; rj < nzero_elem_cnt; ++rj) {
+//             while (map[ri][rj] >= (wj_tile_base + minor_tile_dim)) {
+//                 wj_tile_base += minor_tile_dim;
+//                 ++wj;
+//                 begins[ri][wj] = rj;
+//             }
+//             ++sizes[ri][wj];
+//         }
+
+//         while (wj < minor_ntiles) {
+//             ++wj;
+//             begins[ri][wj] = nzero_elem_cnt;
+//         }
+//     }
+
+//     return (struct matrix_tiling_luts) {
+//         .begins = begins,
+//         .sizes  = sizes
+//     };
+// }
+
 int main(int argc, char *argv[])
 {
     if (argc != 4) {
@@ -262,6 +320,58 @@ int main(int argc, char *argv[])
         .ttk        = div_rup(matB.ncols, t_k),
     };
     sim = initialize_simulator(&cfg);
+    
+    // WARNING: hardcoded cursor to IJK (tile-level), Gust (in-tile)
+    {
+        sim.cursor = (struct cursor) {
+            .outer_dim      = sim.cfg.I,
+            .middle_dim     = sim.cfg.J,
+            .inner_dim      = sim.cfg.K,
+            .outer_tile_dim = sim.cfg.iii,
+            .middle_tile_dim= sim.cfg.jjj,
+            .inner_tile_dim = sim.cfg.kkk,
+            .outer_ntiles   = sim.cfg.tti,
+            .middle_ntiles  = sim.cfg.ttj,
+            .inner_ntiles   = sim.cfg.ttk,
+
+            .ti             = 0,
+            .tj             = 0,
+            .tk             = 0,
+
+            .outer_tile_idx = &sim.cursor.ti,
+            .middle_tile_idx= &sim.cursor.tj,
+            .inner_tile_idx = &sim.cursor.tk,
+
+            .outer_wrap     = &sim.cursor.wrap_ti, // outer should never wrap
+            .middle_wrap    = &sim.cursor.wrap_ti,
+            .inner_wrap     = &sim.cursor.wrap_ti
+        };
+
+        sim.cursor.A    = (struct tile) {
+            .major_dim  = sim.cfg.iii,
+            .minor_dim  = sim.cfg.jjj,
+            .map        = (const Coord **)A,
+            .offsets    = (const Coord *)offsetarrayA,
+            .minor_wrap     = &sim.cursor.wrap_tj,
+            .major_tile_idx = &sim.cursor.ti,
+            .minor_tile_idx = &sim.cursor.tj
+        };
+
+        sim.cursor.B    = (struct tile) {
+            .major_dim  = sim.cfg.jjj,
+            .minor_dim  = sim.cfg.kkk,
+            .map        = (const Coord **)B,
+            .offsets    = (const Coord *)offsetarrayB,
+            .minor_wrap     = &sim.cursor.wrap_tk,
+            .major_tile_idx = &sim.cursor.tj,
+            .minor_tile_idx = &sim.cursor.tk
+        };
+
+        sim.cursor.A.begins = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.A.sizes  = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.B.begins = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.B.sizes  = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+    }
 
     parse_matrix(matrix1_file, &matA);
     A   = matA.M;
@@ -325,6 +435,52 @@ int main(int argc, char *argv[])
     Bc  = matB.Mc;
     offsetarrayB = matB.offsetarrayM;
     offsetarrayBc= matB.offsetarrayMc;
+
+
+    // {
+    //     struct matrix_tiling_config tile_cfg = {.a = global_persist};
+    //     struct matrix_tiling_luts   luts;
+    //     b16 A_row_major = (dataflow == Inner) || (dataflow == Gust);
+    //     tile_cfg        = A_row_major
+    //         ? (struct matrix_tiling_config) {
+    //             .major_dim      = sim.cfg.I,
+    //             .minor_dim      = sim.cfg.J,
+    //             .minor_tile_dim = sim.cfg.jjj,
+    //             .map            = A,
+    //             .offsets        = offsetarrayA,
+    //         }
+    //         : (struct matrix_tiling_config) {
+    //             .major_dim      = sim.cfg.J,
+    //             .minor_dim      = sim.cfg.I,
+    //             .minor_tile_dim = sim.cfg.iii,
+    //             .map            = Ac,
+    //             .offsets        = offsetarrayAc,
+    //         };
+    //     luts = create_tiling_luts(&tile_cfg);
+    //     sim.beginsA = luts.begins;
+    //     sim.sizesA  = luts.sizes;
+
+    //     b16 B_row_major = (dataflow == Outer) || (dataflow == Gust);
+    //     tile_cfg        = B_row_major
+    //         ? (struct matrix_tiling_config) {
+    //             .major_dim      = sim.cfg.J,
+    //             .minor_dim      = sim.cfg.K,
+    //             .minor_tile_dim = sim.cfg.kkk,
+    //             .map            = B,
+    //             .offsets        = offsetarrayB,
+    //         }
+    //         : (struct matrix_tiling_config) {
+    //             .major_dim      = sim.cfg.K,
+    //             .minor_dim      = sim.cfg.J,
+    //             .minor_tile_dim = sim.cfg.jjj,
+    //             .map            = Bc,
+    //             .offsets        = offsetarrayBc,
+    //         };
+    //     luts = create_tiling_luts(&tile_cfg);
+    //     sim.beginsB = luts.begins;
+    //     sim.sizesB  = luts.sizes;
+    // }
+
 
     /******************Config************************************/
 
