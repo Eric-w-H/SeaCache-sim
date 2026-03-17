@@ -533,13 +533,13 @@ long long prefetch_increments = 0;
 long long data_access_hit = 0;
 long long data_access_total = 0;
 
-bool cacheRead(long long addr) {
-
+bool cacheRead(long long addr)
+{
     totalaccess++;
     data_access_total++;
 
-    // cache hit!
     if (cacheHit(addr)) {
+        // cache hit!
 
         totalhit++;
         data_access_hit++;
@@ -547,9 +547,8 @@ bool cacheRead(long long addr) {
         computeSramAccess += sramReadBandwidth(CACHE_BLOCK_NELEMS);
         hitcnt++;
         return 1;
-    }
-    // cache miss
-    else {
+    } else {
+        // cache miss
         // dram load
         computeDramAccess += memoryBandwidthPE(CACHE_BLOCK_NELEMS);
         // sram write
@@ -562,54 +561,6 @@ bool cacheRead(long long addr) {
 
         misscnt++;
         return 0;
-    }
-}
-
-void cacheRead(long long addr, int length) {
-
-    totalaccess++;
-    data_access_total++;
-
-    // the begin of this cacheblock
-    addr = addr - (addr % CACHE_BLOCK_NELEMS);
-
-    // cache hit!
-    if (cacheHit(addr)) {
-
-        totalhit++;
-        data_access_hit++;
-        // sram read
-        computeSramAccess += sramReadBandwidth(length);
-        hitcnt++;
-    }
-    // cache miss
-    else {
-        // dram load
-        computeDramAccess += memoryBandwidthPE(CACHE_BLOCK_NELEMS);
-        // sram write
-        computeSramAccess += sramWriteBandwidth(length);
-        totalB += memoryBandwidthPE(CACHE_BLOCK_NELEMS);
-        // update cache status
-        cacheReplace(addr);
-        misscnt++;
-    }
-}
-
-void cacheEvict(long long addr) {
-    // cache hit! evict
-    if (cacheHit(addr)) {
-        int _set = getSet(addr);
-        int _tag = getTag(addr);
-
-        // set the valid to 0
-        for (int i = 0; i < SETASSOC; i++) {
-            if (Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag)) {
-                Valid[_set * SETASSOC + i] = 0;
-            }
-        }
-    }
-    // cache miss, don't need to evict
-    else {
     }
 }
 

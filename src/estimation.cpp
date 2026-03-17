@@ -1,4 +1,5 @@
 #include "headers.h"
+#include "arena.h"
 #include "util.h"
 
 long long estEffMAC;
@@ -14,65 +15,38 @@ struct pair_hash {
 
 void getParameter()
 {
-    // These only live in this function
-    std::unique_ptr<map<int, bool>[]> estC;
-    std::unique_ptr<int[]> endA, endB;
+    struct Arena_Mark mark = arena_snap(global_temp);
+    b8  *seen;
+    u64 *dirty;
+    seen = (b8 *)arena_push(global_temp, sim.cfg.K*sizeof(*seen), __alignof__(*seen), 1);
+    dirty= (u64*)arena_push(global_temp, sim.cfg.K*sizeof(*dirty), __alignof__(*dirty), 0);
 
-    unordered_set<f64> hashset;
-    priority_queue<f64> hashqu;
+    estEffMAC   = 0;
+    u64 estnnzC = 0;
 
-    unordered_set<pair<f64, int>, pair_hash> hashsetr;
-    priority_queue<pair<f64, int>> hashqur;
+    for (u64 i = 0; i < sim.cfg.I; ++i) {
+        u64 lenA = offsetarrayA[i+1] - offsetarrayA[i];
+        u64 ndirty = 0;
 
-    unordered_set<f64> Fset;
-    unordered_set<pair<f64, int>, pair_hash> Fsetr;
-
-    unordered_set<f64> hashsetTJ[256];
-    priority_queue<f64> hashquTJ[256];
-
-    long long estnnzC, nnzCTk[33];
-
-    vector<f64> vectorTK[8195];
-
-    try {
-        estC = std::make_unique<map<int, bool>[]>(max(sim.cfg.I, sim.cfg.J));
-        endA = std::make_unique<int[]>(sim.cfg.I);
-        endB = std::make_unique<int[]>(sim.cfg.J);
-    } catch (const std::bad_alloc &e) {
-        std::cerr << "Allocation failed: " << e.what() << std::endl;
-        exit(1);
-    }
-
-    // get parameters in force
-
-    // calculate estEffMAC and nnzC
-    estEffMAC = 0;
-    estnnzC = 0;
-
-    for (int i = 0; i < sim.cfg.I; i++)
-        endA[i] = offsetarrayA[i+1] - offsetarrayA[i];
-
-    for (int j = 0; j < sim.cfg.J; j++)
-        endB[j] = offsetarrayB[j+1] - offsetarrayB[j];
-
-    for (int i = 0; i < sim.cfg.I; i++) {
-        int lenA = endA[i];
-        for (int j = 0; j < lenA; j++) {
-            int tmpx = A[i][j];
-
-            int lenB = endB[tmpx];
+        for (u64 j = 0; j < lenA; ++j) {
+            u64 tmpx = A[i][j];
+            u64 lenB = offsetarrayB[tmpx+1] - offsetarrayB[tmpx];
             estEffMAC += lenB;
 
-            for (int k = 0; k < lenB; k++) {
-
-                int tmpk = B[tmpx][k];
-                if (!estC[i][tmpk]) {
-                    estC[i][tmpk] = 1;
-                    estnnzC++;
+            for (u64 k = 0; k < lenB; ++k) {
+                u64 tmpk = B[tmpx][k];
+                if (!seen[tmpk]) {
+                    seen[tmpk]      = 1;
+                    dirty[ndirty++] = tmpk;
                 }
             }
         }
+
+        estnnzC += ndirty;
+        for (u64 d = 0; d < ndirty; d++)
+            seen[dirty[d]] = 0;
     }
 
     printf("MAC: %lld   nnzC: %lld\n", estEffMAC, estnnzC);
+    arena_rewind(mark);
 }

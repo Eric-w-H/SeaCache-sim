@@ -69,10 +69,7 @@ void updateBlockA() {
     case Inner:
     case Gust:
         // Row-majored
-        for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
-            if (ti >= sim.cfg.I)
-                break;
-
+        for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
             int startj = beginA[ti], tmpj = beginA[ti];
             int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
 
@@ -93,10 +90,7 @@ void updateBlockA() {
     
     case Outer:
         // Col-majored
-        for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-            if (tj >= sim.cfg.J)
-                break;
-
+        for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
             int starti = beginAc[tj], tmpi = beginAc[tj];
             int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
 
@@ -116,10 +110,7 @@ void updateBlockB() {
     case Outer:
     case Gust:
         // Row-majored
-        for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-            if (tj >= sim.cfg.J)
-                break;
-
+        for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
             int startk = beginB[tj], tmpk = beginB[tj],
                 maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -133,10 +124,7 @@ void updateBlockB() {
 
     case Inner:
         // Col-majored
-        for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
-            if (tk >= sim.cfg.K)
-                break;
-
+        for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
             int startj = beginBc[tk], tmpj = beginBc[tk],
                 maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -152,11 +140,9 @@ void updateBlockB() {
 }
 
 // each time after update TJ
-void updateBeginA() {
-    for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
-        if (ti >= sim.cfg.I)
-            break;
-
+void updateBeginA()
+{
+    for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
         // int startj = beginA[ti];
         int tmpj = beginA[ti];
         int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
@@ -199,11 +185,9 @@ void AllupdateBeginA() {
 }
 
 // each time update TI
-void updateBeginAc() {
-    for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-        if (tj >= sim.cfg.J)
-            break;
-
+void updateBeginAc()
+{
+    for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
         // int starti = beginAc[tj];
         int tmpi = beginAc[tj];
         int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
@@ -216,9 +200,8 @@ void updateBeginAc() {
     }
 }
 
-void AllupdateBeginB() {
-
-    // update beginB
+void AllupdateBeginB()
+{
     for (int tj = 0; tj < sim.cfg.J; tj++) {
         int tmpk = beginB[tj];
         int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
@@ -247,13 +230,10 @@ void AllupdateBeginBc() {
 }
 
 // each time update Tk
-void updateBeginB() {
-
+void updateBeginB()
+{
     // update beginB
-    for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-        if (tj >= sim.cfg.J)
-            break;
-
+    for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
         int tmpk = beginB[tj];
         int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -266,12 +246,10 @@ void updateBeginB() {
 }
 
 // eachtime update TJ
-void updateBeginBc() {
+void updateBeginBc()
+{
     // update beginBc
-    for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
-        if (tk >= sim.cfg.K)
-            break;
-
+    for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
         int tmpj = beginBc[tk];
         int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -543,9 +521,7 @@ bool checkAndLoadReuseA() {
 
                 // on-chip fiber start
 
-                for (int ti = TI; ti < TI + sim.cfg.iii; ti++) {
-                    if (ti >= sim.cfg.I)
-                        break;
+                for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
                     Asizenow++;
 
                     int startj = beginA[ti], tmpj = beginA[ti],
@@ -654,10 +630,7 @@ void pre_load_B() {
             int _TJ;
             // int _TK;
 
-            for (tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-                if (tj >= sim.cfg.J)
-                    break;
-
+            for (tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
                 if ((tj - TJ) < (sim.cfg.jjj / 2)) {
                     _TJ = 0;
                 } else {
@@ -723,10 +696,7 @@ void pre_load_B() {
                 bufferedsizeB[tj] = 0;
             }
 
-            for (int tk = TK; tk < TK + sim.cfg.kkk; tk++) {
-                if (tk >= sim.cfg.K)
-                    break;
-
+            for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
                 int startj = beginBc[tk], tmpj = beginBc[tk],
                     maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
@@ -777,10 +747,7 @@ void pre_load_B() {
             int tk;
             // 这里preload就是为了确定dynamic的
             // for(tk = TK; tk < TK+((ISDYNAMICK)?dynk:kkk); tk ++){
-            for (tk = TK; tk < TK + sim.cfg.kkk; tk++) {
-                if (tk >= sim.cfg.K)
-                    break;
-
+            for (tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
                 // on-chip fiber start
                 Bsizenow++;
 
@@ -827,10 +794,7 @@ void pre_load_B() {
                 bufferedsizeB[tk] = 0;
             }
 
-            for (int tj = TJ; tj < TJ + sim.cfg.jjj; tj++) {
-                if (tj >= sim.cfg.J)
-                    break;
-
+            for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
                 int startk = beginB[tj], tmpk = beginB[tj],
                     maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
@@ -1711,9 +1675,7 @@ void calculate() {
             // reinitialize the next pointer for FLRU
             if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
                 cacheScheme == CACHE_SCHEME_SPARCH) {
-                for (int j1 = TJ; j1 < TJ + sim.cfg.jjj; j1++) {
-                    if (j1 > sim.cfg.J)
-                        break;
+                for (int j1 = TJ; j1 < min(TJ + sim.cfg.jjj, sim.cfg.J); j1++) {
                     while (!nextposvector[j1].empty()) {
                         nextposvector[j1].pop();
                     }
@@ -1731,7 +1693,7 @@ void calculate() {
 
             // first prefill the prefetch window
             for (int ii = 0; prefetchNow < prefetchSize && ii < sim.cfg.iii; ii++) {
-                if (TI + ii > sim.cfg.I)
+                if (TI + ii >= sim.cfg.I)
                     break;
 
                 prefetchRowNow = TI + ii;
@@ -1743,7 +1705,7 @@ void calculate() {
         }
 
         for (int ii = 0; ii < sim.cfg.iii; ii++) {
-            if (TI + ii > sim.cfg.I)
+            if (TI + ii >= sim.cfg.I)
                 break;
 
             // get O(J) corresponding B (different from Gust and Inner)
@@ -2003,7 +1965,9 @@ void reinitialize() {
     }
 }
 
-int getcntc(int ii) {
+int getcntc(int ii) 
+{
+    // TODO: dirty list fix
     int tmpj = beginA[ii];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
@@ -2038,17 +2002,13 @@ void postTileMerge() {
     // another way to realize this is to add once read each time when we write C
     // already added in the C writing position for gust and IP
 
-    if (dataflow == Gust) {
-        if (sim.cfg.jjj != sim.cfg.J) {
+    if ((dataflow == Gust) && (sim.cfg.jjj != sim.cfg.J)) {
+        for (int ii = 0; ii < sim.cfg.I; ii++) {
+            int cntc = getcntc(ii);
 
-            for (int ii = 0; ii < sim.cfg.I; ii++) {
-
-                int cntc = getcntc(ii);
-
-                computeDramAccess += memoryBandwidthPE(cntc * 3);
-                postC += memoryBandwidthPE(cntc * 3);
-                AccessByte += cntc * 3;
-            }
+            computeDramAccess += memoryBandwidthPE(cntc * 3);
+            postC += memoryBandwidthPE(cntc * 3);
+            AccessByte += cntc * 3;
         }
     }
 
@@ -2069,8 +2029,8 @@ void postTileMerge() {
     postSramAccess /= sramBank;
     postDramAccess /= PEcnt;
 
-    totalCycle += max(postDramAccess, postSramAccess);
-    postCycle += max(postDramAccess, postSramAccess);
+    totalCycle  += max(postDramAccess, postSramAccess);
+    postCycle   += max(postDramAccess, postSramAccess);
 }
 
 
