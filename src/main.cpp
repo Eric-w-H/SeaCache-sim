@@ -201,6 +201,14 @@ void parse_matrix(FILE *f, struct matrix *x)
 //     };
 // }
 
+void reset_cursor(struct cursor *c)
+{
+    c->first= 1;
+    c->ti   = 0;
+    c->tj   = 0;
+    c->tk   = 0;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 4) {
@@ -321,58 +329,6 @@ int main(int argc, char *argv[])
     };
     sim = initialize_simulator(&cfg);
     
-    // WARNING: hardcoded cursor to IJK (tile-level), Gust (in-tile)
-    {
-        sim.cursor = (struct cursor) {
-            .outer_dim      = sim.cfg.I,
-            .middle_dim     = sim.cfg.J,
-            .inner_dim      = sim.cfg.K,
-            .outer_tile_dim = sim.cfg.iii,
-            .middle_tile_dim= sim.cfg.jjj,
-            .inner_tile_dim = sim.cfg.kkk,
-            .outer_ntiles   = sim.cfg.tti,
-            .middle_ntiles  = sim.cfg.ttj,
-            .inner_ntiles   = sim.cfg.ttk,
-
-            .ti             = 0,
-            .tj             = 0,
-            .tk             = 0,
-
-            .outer_tile_idx = &sim.cursor.ti,
-            .middle_tile_idx= &sim.cursor.tj,
-            .inner_tile_idx = &sim.cursor.tk,
-
-            .outer_wrap     = &sim.cursor.wrap_ti, // outer should never wrap
-            .middle_wrap    = &sim.cursor.wrap_ti,
-            .inner_wrap     = &sim.cursor.wrap_ti
-        };
-
-        sim.cursor.A    = (struct tile) {
-            .major_dim  = sim.cfg.iii,
-            .minor_dim  = sim.cfg.jjj,
-            .map        = (const Coord **)A,
-            .offsets    = (const Coord *)offsetarrayA,
-            .minor_wrap     = &sim.cursor.wrap_tj,
-            .major_tile_idx = &sim.cursor.ti,
-            .minor_tile_idx = &sim.cursor.tj
-        };
-
-        sim.cursor.B    = (struct tile) {
-            .major_dim  = sim.cfg.jjj,
-            .minor_dim  = sim.cfg.kkk,
-            .map        = (const Coord **)B,
-            .offsets    = (const Coord *)offsetarrayB,
-            .minor_wrap     = &sim.cursor.wrap_tk,
-            .major_tile_idx = &sim.cursor.tj,
-            .minor_tile_idx = &sim.cursor.tk
-        };
-
-        sim.cursor.A.begins = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
-        sim.cursor.A.sizes  = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
-        sim.cursor.B.begins = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
-        sim.cursor.B.sizes  = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
-    }
-
     parse_matrix(matrix1_file, &matA);
     A   = matA.M;
     Ac  = matA.Mc;
@@ -481,6 +437,59 @@ int main(int argc, char *argv[])
     //     sim.sizesB  = luts.sizes;
     // }
 
+    // WARNING: hardcoded cursor to IJK (tile-level), Gust (in-tile)
+    {
+        sim.cursor = (struct cursor) {
+            .outer_dim      = sim.cfg.I,
+            .middle_dim     = sim.cfg.J,
+            .inner_dim      = sim.cfg.K,
+            .outer_tile_dim = sim.cfg.iii,
+            .middle_tile_dim= sim.cfg.jjj,
+            .inner_tile_dim = sim.cfg.kkk,
+            .outer_ntiles   = sim.cfg.tti,
+            .middle_ntiles  = sim.cfg.ttj,
+            .inner_ntiles   = sim.cfg.ttk,
+
+            // .ti             = 0,
+            // .tj             = 0,
+            // .tk             = 0,
+
+            .outer_tile_idx = &sim.cursor.ti,
+            .middle_tile_idx= &sim.cursor.tj,
+            .inner_tile_idx = &sim.cursor.tk,
+
+            .outer_wrap     = &sim.cursor.wrap_ti, // outer should never wrap
+            .middle_wrap    = &sim.cursor.wrap_tj,
+            .inner_wrap     = &sim.cursor.wrap_tk
+        };
+
+        sim.cursor.A    = (struct tile) {
+            .major_dim      = sim.cfg.iii,
+            .minor_dim      = sim.cfg.jjj,
+            .map            = (const Coord **)A,
+            .offsets        = (const Coord *)offsetarrayA,
+            .minor_wrap     = &sim.cursor.wrap_tj,
+            .major_tile_idx = &sim.cursor.ti,
+            .minor_tile_idx = &sim.cursor.tj
+        };
+
+        sim.cursor.B    = (struct tile) {
+            .major_dim      = sim.cfg.jjj,
+            .minor_dim      = sim.cfg.kkk,
+            .map            = (const Coord **)B,
+            .offsets        = (const Coord *)offsetarrayB,
+            .minor_wrap     = &sim.cursor.wrap_tk,
+            .major_tile_idx = &sim.cursor.tj,
+            .minor_tile_idx = &sim.cursor.tk
+        };
+
+        sim.cursor.A.begins = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.A.sizes  = (Coord *)arena_push(global_persist, sim.cursor.A.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.B.begins = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+        sim.cursor.B.sizes  = (Coord *)arena_push(global_persist, sim.cursor.B.major_dim*sizeof(Coord), __alignof__(Coord), 1);
+    }
+
+
 
     /******************Config************************************/
 
@@ -526,6 +535,7 @@ int main(int argc, char *argv[])
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
+        reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
         adaptive_prefetch = 0;
@@ -543,6 +553,7 @@ int main(int argc, char *argv[])
         CACHE_BLOCK_NELEMS = 16;
         CACHE_BLOCK_NELEMS_LOG2 = 4;
         setSET();
+        reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
         ////////////  Sparch
@@ -570,6 +581,7 @@ int main(int argc, char *argv[])
             newttk = (sim.cfg.K + sim.cfg.kkk - 1) / sim.cfg.kkk;
             cachesize -= sim.cfg.kkk * 2;
         }
+        reset_cursor(&sim.cursor);
         runTile(newkkk);
         // return to the default setting
         CACHE_BLOCK_NELEMS = 16;
@@ -588,6 +600,7 @@ int main(int argc, char *argv[])
         CACHE_BLOCK_NELEMS = 4;
         CACHE_BLOCK_NELEMS_LOG2 = 2;
         setSET();
+        reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
         // return to the default setting
@@ -602,6 +615,7 @@ int main(int argc, char *argv[])
 
         reinitialize();
 
+        reset_cursor(&sim.cursor);
         run();
     }
 

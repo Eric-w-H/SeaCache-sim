@@ -169,9 +169,15 @@ void compute_tile_luts(struct tile *t, b16 reset_begins)
 
 void advance_cursor() // / tile pair
 {
+    // 35479 35479 35479
     struct cursor *c= &sim.cursor;
-    b16 first = (c->ti == 0) && (c->tj == 0) && (c->tk == 0);
-    // b16 A_need_recompute
+    if (c->first) {
+        // printf("\n%u %u %u [first]\n", c->ti, c->tj, c->tk);
+        c->first = 0;
+        compute_tile_luts(&c->A, 1);
+        compute_tile_luts(&c->B, 1);
+        return;
+    }
 
     // increment tile indices and check if either tile needs recomputing
     b16 Atile_need_recompute, A_reset_begins;
@@ -195,24 +201,10 @@ void advance_cursor() // / tile pair
             *c->middle_wrap     = inner_at_lim && middle_at_lim;
             *c->outer_wrap      = 0; // outer never wraps
         }
-        Atile_need_recompute=
-            first
-        ||  (old_A_major_tile_idx != *c->A.major_tile_idx)
-        ||  (old_A_minor_tile_idx != *c->A.minor_tile_idx);
-
-        Btile_need_recompute=
-            first
-        ||  (old_B_major_tile_idx != *c->B.major_tile_idx)
-        ||  (old_B_minor_tile_idx != *c->B.minor_tile_idx);
-
-        A_reset_begins =
-            first
-        ||  *c->A.minor_wrap
-        ||  (old_A_major_tile_idx != *c->A.major_tile_idx);
-        B_reset_begins =
-            first
-        ||  *c->B.minor_wrap
-        ||  (old_B_major_tile_idx != *c->B.major_tile_idx);
+        Atile_need_recompute= (old_A_major_tile_idx != *c->A.major_tile_idx) || (old_A_minor_tile_idx != *c->A.minor_tile_idx);
+        Btile_need_recompute= (old_B_major_tile_idx != *c->B.major_tile_idx) || (old_B_minor_tile_idx != *c->B.minor_tile_idx);
+        A_reset_begins = *c->A.minor_wrap || (old_A_major_tile_idx != *c->A.major_tile_idx);
+        B_reset_begins = *c->B.minor_wrap || (old_B_major_tile_idx != *c->B.major_tile_idx);
     }
     
 
@@ -220,6 +212,7 @@ void advance_cursor() // / tile pair
         compute_tile_luts(&c->A, A_reset_begins);
     if (Btile_need_recompute)
         compute_tile_luts(&c->B, B_reset_begins);
+    // printf("%u %u %u (recompute, reset): A=(%d, %d), B=(%d, %d)\n", c->ti, c->tj, c->tk, Atile_need_recompute,A_reset_begins,Btile_need_recompute,B_reset_begins);
 }
 
 // each time after update TJ
@@ -2049,26 +2042,34 @@ int getcntc(int ii)
     // TODO: dirty list fix
     int tmpj = beginA[ii];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
+    Coord ndirty = 0;
 
-    for (int k1 = 0; k1 < sim.cfg.K; k1++) {
+    for (int k1 = 0; k1 < sim.cfg.K; k1++) // FIXME: better tmpC clearing invariants so before clear is not necessary? currently we do both before and after
         tmpC[k1] = 0;
-    }
 
     while (tmpj < maxj && A[ii][tmpj] < sim.cfg.J) {
         // coordinate of required B fiber
         int jj = A[ii][tmpj];
 
-        update_c_fiber(jj);
+        // >> update_c_fiber() inlined
+        for (int k1 = beginB[jj]; k1 < beginB[jj] + currsizeB[jj]; k1++) {
+            Coord index = B[jj][k1];
+            if (!tmpC[index]) {
+                dirtyC[ndirty++]= index;
+                tmpC[index]     = 1;
+            }
+        }
+        // << update_c_fiber() inlined
 
         tmpj++;
     }
 
-    int cntc = 0;
+    Coord cntc = 0;
 
-    for (int k1 = 0; k1 < sim.cfg.K; k1++) {
-        if (tmpC[k1]) {
-            cntc++;
-        }
+    for (Coord d = 0; d < ndirty; ++d) {
+        Coord k1 = dirtyC[d];
+        cntc    += tmpC[k1];
+        tmpC[k1] = 0;
     }
 
     return cntc;
@@ -2081,15 +2082,15 @@ void postTileMerge() {
     // another way to realize this is to add once read each time when we write C
     // already added in the C writing position for gust and IP
 
-    if ((dataflow == Gust) && (sim.cfg.jjj != sim.cfg.J)) {
-        for (int ii = 0; ii < sim.cfg.I; ii++) {
-            int cntc = getcntc(ii);
+    // if ((dataflow == Gust) && (sim.cfg.jjj != sim.cfg.J)) {
+    //     for (int ii = 0; ii < sim.cfg.I; ii++) {
+    //         int cntc = getcntc(ii);
 
-            computeDramAccess += memoryBandwidthPE(cntc * 3);
-            postC += memoryBandwidthPE(cntc * 3);
-            AccessByte += cntc * 3;
-        }
-    }
+    //         computeDramAccess += memoryBandwidthPE(cntc * 3);
+    //         postC += memoryBandwidthPE(cntc * 3);
+    //         AccessByte += cntc * 3;
+    //     }
+    // }
 
     // calculate the inter-cost of outer
     if (dataflow == Outer) {
@@ -2170,6 +2171,8 @@ void run()
                 if (ISCACHE) { // FIXME(ejs): seems redundant and slow
                     initializeCacheValid();
                 }
+
+                // advance_cursor();
 
                 pre_calculate_load();
 

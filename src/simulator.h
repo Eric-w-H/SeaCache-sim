@@ -40,6 +40,7 @@ struct cursor {
 
     // mutables
     // tile indices
+    b16     first;
     Coord   ti, // [0,... i_ntiles)
             tj, // [0,... j_ntiles)
             tk; // [0,... k_ntiles)
