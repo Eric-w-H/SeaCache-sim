@@ -326,10 +326,10 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
 
         int fiberid = addr >> CACHE_BLOCK_NELEMS_LOG2;
         int tmpblocksize = CACHE_BLOCK_NELEMS;
-        tmpblocksize -= currsizeB[fiberid] * 3;
+        tmpblocksize -= sim.cursor.B.sizes[fiberid - TJ] * 3;
         while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + sim.cfg.jjj)) {
-            if (currsizeB[fiberid + fibercnt] * 3 <= tmpblocksize) {
-                tmpblocksize -= currsizeB[fiberid + fibercnt] * 3;
+            if (sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3 <= tmpblocksize) {
+                tmpblocksize -= sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3;
                 fibercnt++;
             } else {
                 break;
@@ -758,7 +758,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         //      here at each single fiber access
         int tmpaddr = offsetarrayB[jj] * 3;
         // add the current bias of this row
-        tmpaddr += beginB[jj] * 3;
+        tmpaddr += sim.cursor.B.begins[jj - TJ] * 3;
         tmpaddr += sim.cfg.J;
 
         // need to read a whole line here
@@ -924,7 +924,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     // kept in the LFUtag, but the extra lfubit
     if (cacheScheme == CACHE_SCHEME_FLFU) {
         bool anymiss = 0;
-        fibersize = currsizeB[jj] * 3;
+        fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
         for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NELEMS) {
             long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NELEMS);
             bool tmphit = cacheReadPracticalLFU(tmpaddr, tmpcurr == 0, getCacheAddr(jj, 0));

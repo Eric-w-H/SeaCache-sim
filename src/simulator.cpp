@@ -9,31 +9,7 @@
 set<int> *bufferedC = nullptr;
 // record length of buffered C
 // equals bufferedC[i].size()
-int *bufferedClen = nullptr;
-
-int *beginA = nullptr;
-int *beginB = nullptr;
-
-int *beginAc = nullptr;
-int *beginBc = nullptr;
-
 Coord *dirtyC = NULL;
-
-// int *begin = nullptr;
-
-/*
-The current fiber size of each array
-stored according to the dataflow order
-(not the storage format order)
-
-update currsize each time the block of the array changes
-(when inter-iterate)
-*/
-int *currsizeA = nullptr;
-int *currsizeAc = nullptr;
-int *currsizeB = nullptr;
-int *currsizeBc = nullptr;
-// int *currsizeC = nullptr;
 
 /*
 The currently buffered size of each array
@@ -52,87 +28,6 @@ int TI, TJ, TK;
 // STAR: call this
 // when: 1) start time 2) each time update I/J
 // can over called by call each time
-/*
-update currsizeA/B/C here!
-(each time the block iterate)
-currsize is consistent to dataflow order
-*/
-void updateBlockA() {
-
-    switch (dataflow) {
-    case Inner:
-    case Gust:
-        // Row-majored
-        for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
-            int startj = beginA[ti], tmpj = beginA[ti];
-            int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
-
-            // jjj -> ((ISDYNAMICJ)?dynj:jjj)
-
-            // wrong!  this function is use to calculate the new currsizeA
-            // can't simply change to dynj
-            // solution: add a update fuction after pre-load B
-
-            // check: will pre_load use this currsizeA and currsizeB ? -> cause cycle
-            while (tmpj < maxj && A[ti][tmpj] < sim.cfg.jjj + TJ) {
-                tmpj++;
-            }
-
-            currsizeA[ti] = tmpj - startj;
-        }
-        break;
-    
-    case Outer:
-        // Col-majored
-        for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-            int starti = beginAc[tj], tmpi = beginAc[tj];
-            int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-            while (tmpi < maxi && Ac[tj][tmpi] < sim.cfg.iii + TI) {
-                tmpi++;
-            }
-
-            currsizeAc[tj] = tmpi - starti;
-        }
-        break;
-    }
-
-}
-
-void updateBlockB() {
-    switch (dataflow) {
-    case Outer:
-    case Gust:
-        // Row-majored
-        for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-            int startk = beginB[tj], tmpk = beginB[tj],
-                maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
-
-            while (tmpk < maxk && B[tj][tmpk] < sim.cfg.kkk + TK) {
-                tmpk++;
-            }
-
-            currsizeB[tj] = tmpk - startk;
-        }
-        break;
-
-    case Inner:
-        // Col-majored
-        for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
-            int startj = beginBc[tk], tmpj = beginBc[tk],
-                maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-            while (tmpj < maxj && Bc[tk][tmpj] < sim.cfg.jjj + TJ) {
-                tmpj++;
-            }
-
-            currsizeBc[tk] = tmpj - startj;
-        }
-        break;
-    }
-
-}
-
 void compute_tile_luts(struct tile *t, b16 reset_begins)
 {
     Coord   major_dim, minor_dim, major_idx, minor_idx;
@@ -215,358 +110,6 @@ void advance_cursor() // / tile pair
     // printf("%u %u %u (recompute, reset): A=(%d, %d), B=(%d, %d)\n", c->ti, c->tj, c->tk, Atile_need_recompute,A_reset_begins,Btile_need_recompute,B_reset_begins);
 }
 
-// each time after update TJ
-void updateBeginA()
-{
-    for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
-        // int startj = beginA[ti];
-        int tmpj = beginA[ti];
-        int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
-
-        // here is TJ because TJ have added jjj before call the func
-        while (tmpj < maxj && A[ti][tmpj] < TJ) {
-            tmpj++;
-        }
-
-        beginA[ti] = tmpj;
-    }
-}
-
-void ALLupdateBeginAc() {
-    for (int tj = 0; tj < sim.cfg.J; tj++) {
-        // int starti = beginAc[tj];
-        int tmpi = beginAc[tj];
-        int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-        while (tmpi < maxi && Ac[tj][tmpi] < TI) {
-            tmpi++;
-        }
-
-        beginAc[tj] = tmpi;
-    }
-}
-
-void AllupdateBeginA() {
-    for (int ti = 0; ti < sim.cfg.I; ti++) {
-        // int startj = beginA[ti];
-        int tmpj = beginA[ti];
-        int maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
-        while (tmpj < maxj && A[ti][tmpj] < TJ) {
-            tmpj++;
-        }
-
-        beginA[ti] = tmpj;
-        // printf("%d %d %d %d   ", startj, tmpj, maxj, beginA[ti]);
-    }
-}
-
-// each time update TI
-void updateBeginAc()
-{
-    for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-        // int starti = beginAc[tj];
-        int tmpi = beginAc[tj];
-        int maxi = offsetarrayAc[tj + 1] - offsetarrayAc[tj];
-
-        while (tmpi < maxi && Ac[tj][tmpi] < TI) {
-            tmpi++;
-        }
-
-        beginAc[tj] = tmpi;
-    }
-}
-
-void AllupdateBeginB()
-{
-    for (int tj = 0; tj < sim.cfg.J; tj++) {
-        int tmpk = beginB[tj];
-        int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
-
-        while (tmpk < maxk && B[tj][tmpk] < TK) {
-            tmpk++;
-        }
-
-        beginB[tj] = tmpk;
-    }
-}
-
-void AllupdateBeginBc() {
-
-    // update beginBc
-    for (int tk = 0; tk < sim.cfg.K; tk++) {
-        int tmpj = beginBc[tk];
-        int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-        while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
-            tmpj++;
-        }
-
-        beginBc[tk] = tmpj;
-    }
-}
-
-// each time update Tk
-void updateBeginB()
-{
-    // update beginB
-    for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-        int tmpk = beginB[tj];
-        int maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
-
-        while (tmpk < maxk && B[tj][tmpk] < TK) {
-            tmpk++;
-        }
-
-        beginB[tj] = tmpk;
-    }
-}
-
-// eachtime update TJ
-void updateBeginBc()
-{
-    // update beginBc
-    for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
-        int tmpj = beginBc[tk];
-        int maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
-
-        while (tmpj < maxj && Bc[tk][tmpj] < TJ) {
-            tmpj++;
-        }
-
-        beginBc[tk] = tmpj;
-    }
-}
-
-// return 1 if I is before J in the interorder
-// return 0 if J -> I
-bool isIJ() {
-    if (interorder == IJK || interorder == IKJ || interorder == KIJ)
-        return 1;
-    return 0;
-}
-
-// return 1 if J is before K in the interorder
-// return 0 if K -> J
-bool isJK() {
-    if (interorder == JKI || interorder == JIK || interorder == IJK)
-        return 1;
-    return 0;
-}
-
-void updateTI() {
-    TI += sim.cfg.iii;
-
-    if (isIJ()) {
-        ALLupdateBeginAc();
-    } else {
-        updateBeginAc();
-    }
-}
-
-void updateTJ() {
-    TJ += sim.cfg.jjj;
-
-    if (isIJ()) {
-        updateBeginA();
-    } else {
-        AllupdateBeginA();
-    }
-
-    if (isJK()) {
-        AllupdateBeginBc();
-    } else {
-        updateBeginBc();
-    }
-}
-
-void updateTK() {
-    TK += sim.cfg.kkk;
-
-    if (isJK()) {
-        updateBeginB();
-    } else {
-        AllupdateBeginB();
-    }
-}
-
-bool iterate_inner_loop() {
-    if ((interorder == IJK) || (interorder == JIK)) {
-        // adddyn
-        if (TK + sim.cfg.kkk < sim.cfg.K) {
-            updateTK();
-            return 1;
-        } else {
-            TK += sim.cfg.kkk;
-            return 0;
-        }
-    } else if ((interorder == IKJ) || (interorder == KIJ)) {
-        if (TJ + sim.cfg.jjj < sim.cfg.J) {
-            updateTJ();
-            return 1;
-        } else {
-            TJ += sim.cfg.jjj;
-            return 0;
-        }
-    } else if ((interorder == JKI) || (interorder == KJI)) {
-        if (TI + sim.cfg.iii < sim.cfg.I) {
-            updateTI();
-            return 1;
-
-        } else {
-            TI += sim.cfg.iii;
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
-bool iterate_mid_loop() {
-    if ((interorder == IKJ) || (interorder == JKI)) {
-        if (TK + sim.cfg.kkk < sim.cfg.K) {
-            updateTK();
-            return 1;
-        } else {
-            TK += sim.cfg.kkk;
-            return 0;
-        }
-    } else if ((interorder == IJK) || (interorder == KJI)) {
-        if (TJ + sim.cfg.jjj < sim.cfg.J) {
-            updateTJ();
-            return 1;
-        } else {
-            TJ += sim.cfg.jjj;
-            return 0;
-        }
-    } else if ((interorder == JIK) || (interorder == KIJ)) {
-        if (TI + sim.cfg.iii < sim.cfg.I) {
-            updateTI();
-            return 1;
-        } else {
-            TI += sim.cfg.iii;
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
-bool iterate_outer_loop() {
-    if ((interorder == KIJ) || (interorder == KJI)) {
-        if (TK + sim.cfg.kkk < sim.cfg.K) {
-            updateTK();
-            return 1;
-        } else {
-            TK += sim.cfg.kkk;
-            return 0;
-        }
-    } else if ((interorder == JIK) || (interorder == JKI)) {
-        if (TJ + sim.cfg.jjj < sim.cfg.J) {
-            updateTJ();
-            return 1;
-        } else {
-            TJ += sim.cfg.jjj;
-            return 0;
-        }
-    } else if ((interorder == IJK) || (interorder == IKJ)) {
-        if (TI + sim.cfg.iii < sim.cfg.I) {
-            updateTI();
-            return 1;
-        } else {
-            TI += sim.cfg.iii;
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
-void reverse_I() {
-    TI = 0;
-
-    // reinitialize A
-    if (isIJ()) {
-        for (int tmpj = 0; tmpj < sim.cfg.J; tmpj++) {
-            beginAc[tmpj] = 0;
-        }
-    } else {
-        for (int tmpj = TJ; tmpj < TJ + sim.cfg.jjj; tmpj++) {
-            beginAc[tmpj] = 0;
-        }
-    }
-}
-
-void reverse_J() {
-
-    TJ = 0;
-    // reinitialize A
-    if (isIJ()) {
-        for (int tmpi = TI; tmpi < TI + sim.cfg.iii; tmpi++) {
-            beginA[tmpi] = 0;
-        }
-    } else {
-        for (int tmpi = 0; tmpi < sim.cfg.I; tmpi++) {
-            beginA[tmpi] = 0;
-        }
-    }
-
-    // reinitialize Bc
-    if (isJK()) {
-        for (int tmpk = 0; tmpk < sim.cfg.K; tmpk++) {
-            beginBc[tmpk] = 0;
-        }
-    } else {
-        for (int tmpk = TK; tmpk < TK + sim.cfg.kkk; tmpk++) {
-            beginBc[tmpk] = 0;
-        }
-    }
-}
-
-void reverse_K() {
-    TK = 0;
-    // reinitialize B
-    if (isJK()) {
-
-        for (int tmpj = TJ; tmpj < TJ + sim.cfg.jjj; tmpj++) {
-            beginB[tmpj] = 0;
-        }
-    } else {
-        for (int tmpj = 0; tmpj < sim.cfg.J; tmpj++) {
-            beginB[tmpj] = 0;
-        }
-    }
-}
-
-void reinitialize_inner() {
-    if ((interorder == IJK) || (interorder == JIK)) {
-        reverse_K();
-    } else if ((interorder == IKJ) || (interorder == KIJ)) {
-        reverse_J();
-    } else if ((interorder == JKI) || (interorder == KJI)) {
-        reverse_I();
-    }
-}
-
-void reinitialize_mid() {
-    if ((interorder == IKJ) || (interorder == JKI)) {
-        reverse_K();
-    } else if ((interorder == IJK) || (interorder == KJI)) {
-        reverse_J();
-    } else if ((interorder == JIK) || (interorder == KIJ)) {
-        reverse_I();
-    }
-}
-
-void reinitialize_outer() {
-    if ((interorder == KIJ) || (interorder == KJI)) {
-        reverse_K();
-    } else if ((interorder == JIK) || (interorder == JKI)) {
-        reverse_J();
-    } else if ((interorder == IJK) || (interorder == IKJ)) {
-        reverse_I();
-    }
-}
-
 // then will take length+1 place for the next fiberlet pointer
 const int fiberletlength = 4;
 
@@ -600,7 +143,7 @@ bool checkAndLoadReuseA() {
                 for (int ti = TI; ti < min(TI + sim.cfg.iii, sim.cfg.I); ti++) {
                     Asizenow++;
 
-                    int startj = beginA[ti], tmpj = beginA[ti],
+                    int startj = sim.cursor.A.begins[ti - TI], tmpj = sim.cursor.A.begins[ti - TI],
                         maxj = offsetarrayA[ti + 1] - offsetarrayA[ti];
 
                     while (tmpj < maxj && A[ti][tmpj] < sim.cfg.jjj + TJ) {
@@ -703,23 +246,15 @@ void pre_load_B() {
 
             // equals to 0(when jjj in the first half) or 1(when jjj in the second
             // half);
-            int _TJ;
-            // int _TK;
 
             for (tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-                if ((tj - TJ) < (sim.cfg.jjj / 2)) {
-                    _TJ = 0;
-                } else {
-                    _TJ = 1;
-                }
-
                 // on-chip fiber start
                 Bsizenow++;
 
-                int startk = beginB[tj], tmpk = beginB[tj],
+                int startk = sim.cursor.B.begins[tj - TJ], tmpk = sim.cursor.B.begins[tj - TJ],
                     maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
-                int halfk = beginB[tj];
+                int halfk = sim.cursor.B.begins[tj - TJ];
 
                 while (halfk < maxk && B[tj][halfk] < (sim.cfg.kkk / 2) + TK) {
                     halfk++;
@@ -737,7 +272,7 @@ void pre_load_B() {
                         fulltagB = 1;
                         fullB = tj;
                     }
-                    //  currsizeB[tj] = tmpsize;
+                    //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {
 
                     Bsizenow += tmpsize * 3;
@@ -769,7 +304,7 @@ void pre_load_B() {
             }
 
             for (int tk = TK; tk < min(TK + sim.cfg.kkk, sim.cfg.K); tk++) {
-                int startj = beginBc[tk], tmpj = beginBc[tk],
+                int startj = sim.cursor.B.begins[tk - TK], tmpj = sim.cursor.B.begins[tk - TK],
                     maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
                 while (tmpj < maxj) {
@@ -790,9 +325,9 @@ void pre_load_B() {
                         fullB = tk;
                     }
                     // cache the csc size of each col block
-                    //   currsizeBc[tk] = tmpsize;
+                    //   sim.cursor.B.sizes[tk] = tmpsize;
                 } else {
-                    //   currsizeBc[tk] = tmpsize;
+                    //   sim.cursor.B.sizes[tk] = tmpsize;
                     preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
                     preB += memoryBandwidthWhole(tmpsize * 3 + 2);
                     AccessByte += tmpsize * 3 + 2;
@@ -823,7 +358,7 @@ void pre_load_B() {
                 // on-chip fiber start
                 Bsizenow++;
 
-                int startj = beginBc[tk], tmpj = beginBc[tk],
+                int startj = sim.cursor.B.begins[tk - TK], tmpj = sim.cursor.B.begins[tk - TK],
                     maxj = offsetarrayBc[tk + 1] - offsetarrayBc[tk];
 
                 while (tmpj < maxj && Bc[tk][tmpj] < sim.cfg.jjj + TJ) {
@@ -839,7 +374,7 @@ void pre_load_B() {
                         // printf("!!!! %d %d %d %d %d %d %d\n", TI, TJ, TK, iii, jjj, kkk,
                         // tk);
                     }
-                    //  currsizeB[tj] = tmpsize;
+                    //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {
 
                     Bsizenow += tmpsize * 3;
@@ -867,7 +402,7 @@ void pre_load_B() {
             }
 
             for (int tj = TJ; tj < min(TJ + sim.cfg.jjj, sim.cfg.J); tj++) {
-                int startk = beginB[tj], tmpk = beginB[tj],
+                int startk = sim.cursor.B.begins[tj - TJ], tmpk = sim.cursor.B.begins[tj - TJ],
                     maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
                 while (tmpk < maxk) {
@@ -888,9 +423,9 @@ void pre_load_B() {
                         fullB = tj;
                     }
                     // cache the csc size of each col block
-                    //   currsizeBc[tk] = tmpsize;
+                    //   sim.cursor.B.sizes[tk] = tmpsize;
                 } else {
-                    //   currsizeBc[tk] = tmpsize;
+                    //   sim.cursor.B.sizes[tk] = tmpsize;
                     preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
                     preB += memoryBandwidthWhole(tmpsize * 3 + 2);
                     AccessByte += tmpsize * 3 + 2;
@@ -985,6 +520,7 @@ void get_B_fiber(int jj, int ii)
     if (!ISCACHE) {
 
         // two decisions: 1) consistent or not; 2) buffer or not (may bypass)
+        u64 cost = sim.cursor.B.sizes[jj - TJ] * 3 + 2;
 
         if (consistent_B()) {
             // B[jj] is on the buffer
@@ -992,17 +528,14 @@ void get_B_fiber(int jj, int ii)
                 // hit!
                 // different access with B format:
                 // continuous or chained
-                computeSramAccess += sramReadBandwidth(currsizeB[jj] * 3 + 2);
-
+                computeSramAccess   += sramReadBandwidth(cost);
             } else {
                 // B[jj] is not on the buffer, need to access dram
                 // different access with B format
                 // access one dram fiber all check all
-
-                computeDramAccess += memoryBandwidthPE(currsizeB[jj] * 3 + 2);
-
-                computeB += memoryBandwidthPE(currsizeB[jj] * 3 + 2);
-                AccessByte += currsizeB[jj] * 3 + 2;
+                computeDramAccess   += memoryBandwidthPE(cost);
+                computeB            += memoryBandwidthPE(cost);
+                AccessByte          += cost;
             }
         } else {
             // hit part (chained)
@@ -1025,95 +558,87 @@ void get_B_fiber(int jj, int ii)
     // address in cache mode is : fiberid + (relative << bias)  where relative =
     // (relative coordinate in fiber)/CACHEBLOCK
     else {
-        int fibersize = currsizeB[jj] * 3 + 1;
+        int fibersize = sim.cursor.B.sizes[jj - TJ] * 3 + 1;
         cacheAccessFiber(jj, fibersize, ii);
     }
 }
 
 // in IP
-void get_B_fiber_col_iii(int kk, int iii) {
-
+void get_B_fiber_col_iii(int kk, int iii)
+{
+    u64 cost = sim.cursor.B.sizes[kk - TK] * 3 + 2;
     // B[jj] is on the buffer
     if (fulltagB == 0 || kk < fullB) {
         // hit!
         // different access with B format:
         // continuous or chained
-        computeSramAccess += sramReadBandwidth(currsizeBc[kk] * 3 + 2) * iii;
+        computeSramAccess   += sramReadBandwidth(cost) * iii;
 
     } else {
         // B[jj] is not on the buffer, need to access dram
         // different access with B format
         // access one dram fiber all check all
-
-        computeDramAccess += memoryBandwidthPE(currsizeBc[kk] * 3 + 2) * iii;
-
-        computeB += memoryBandwidthPE(currsizeBc[kk] * 3 + 2) * iii;
-        AccessByte += (currsizeBc[kk] * 3 + 2) * iii;
+        computeDramAccess   += memoryBandwidthPE(cost) * iii;
+        computeB            += memoryBandwidthPE(cost) * iii;
+        AccessByte          += (cost) * iii;
     }
 }
 
 void get_A_fiber_col(int jj)
 {
     assert(consistent_A());
+    u64 cost = sim.cursor.A.sizes[jj - TJ] * 3 + 2;
 
     // A[ii] is on the buffer
     if (fulltagA == 0 || jj < fullA) {
         // hit
-        computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2);
+        computeSramAccess += sramReadBandwidth(cost);
     } else {
 
-        computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-        computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-        AccessByte += currsizeAc[jj] * 3 + 2;
-
-        computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
-                                sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
+        computeDramAccess   += memoryBandwidthPE(cost);
+        computeA            += memoryBandwidthPE(cost);
+        AccessByte          += cost;
+        computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
 
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
-            computeDramAccess += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-            computeA += memoryBandwidthPE(currsizeAc[jj] * 3 + 2);
-
-            computeSramAccess += sramReadBandwidth(currsizeAc[jj] * 3 + 2) +
-                                    sramWriteBandwidth(currsizeAc[jj] * 3 + 2);
+            computeDramAccess   += memoryBandwidthPE(cost);
+            computeA            += memoryBandwidthPE(cost);
+            computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
         }
     }
 }
 
 void get_A_fiber(int ii) {
     assert(consistent_A());
+    u64 cost = sim.cursor.A.sizes[ii - TI] * 3 + 2;
 
     // A[ii] is on the buffer
     if (fulltagA == 0 || ii < fullA) {
         // hit
-        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
-
+        computeSramAccess += sramReadBandwidth(cost);
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
-            computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2);
+            computeSramAccess += sramReadBandwidth(cost);
         }
     } else {
-        computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-        computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-        AccessByte += currsizeA[ii] * 3 + 2;
-
-        computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
-                                sramWriteBandwidth(currsizeA[ii] * 3 + 2);
+        computeDramAccess   += memoryBandwidthPE(cost);
+        computeA            += memoryBandwidthPE(cost);
+        AccessByte          += cost;
+        computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
 
         if (cacheScheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
-            computeDramAccess += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-            computeA += memoryBandwidthPE(currsizeA[ii] * 3 + 2);
-
-            computeSramAccess += sramReadBandwidth(currsizeA[ii] * 3 + 2) +
-                                    sramWriteBandwidth(currsizeA[ii] * 3 + 2);
+            computeDramAccess   += memoryBandwidthPE(cost);
+            computeA            += memoryBandwidthPE(cost);
+            computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
         }
     }
 }
 
 void update_c_fiber(int jj) {
 
-    for (int k1 = beginB[jj]; k1 < beginB[jj] + currsizeB[jj]; k1++) {
+    for (int k1 = sim.cursor.B.begins[jj - TJ]; k1 < sim.cursor.B.begins[jj - TJ] + sim.cursor.B.sizes[jj - TJ]; k1++) {
         tmpC[B[jj][k1]] = 1;
     }
 }
@@ -1128,7 +653,6 @@ void updateCAccess(int ii)
         // check the delta buffer: how many new C elements (indicate how many
         // increase)
         int deltaC = 0;
-        // int oldsize = bufferedClen[ii];
         for (int k1 = TK; k1 < TK + sim.cfg.kkk; k1++) {
             if (tmpC[k1]) { // FIXME: use bit vectors
                 // the k1 is a new element
@@ -1139,8 +663,6 @@ void updateCAccess(int ii)
                 }
             }
         }
-        // update the size
-        bufferedClen[ii] += deltaC;
 
         Csizenow += deltaC;
 
@@ -1165,7 +687,6 @@ void updateCAccess(int ii)
 
             for (int i = TI; i < TI + sim.cfg.iii; i++) {
                 bufferedC[i]    = std::set<int>();
-                bufferedClen[i] = 0;
             }
         }
     } else {
@@ -1199,7 +720,7 @@ void updateCAccess(int ii)
 void get_B_fibers(int ii)
 {
     assert(LIKELY(dataflow == Gust));
-    int tmpj = beginA[ii];
+    int tmpj = sim.cursor.A.begins[ii - TI];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
     Coord ndirty = 0;
 
@@ -1207,7 +728,7 @@ void get_B_fibers(int ii)
         // coordinate of required B fiber
         int jj = A[ii][tmpj];
 
-        Coord bsize   = currsizeB[jj];
+        Coord bsize   = sim.cursor.B.sizes[jj - TJ];
 
         // >> get_B_fiber() inlined
         // In Blocking Mode
@@ -1258,7 +779,7 @@ void get_B_fibers(int ii)
         elements_processed_since_last_adjustment += bsize;
 
         // >> update_c_fiber() inlined
-        for (int k1 = beginB[jj]; k1 < beginB[jj] + bsize; k1++) {
+        for (int k1 = sim.cursor.B.begins[jj - TJ]; k1 < sim.cursor.B.begins[jj - TJ] + bsize; k1++) {
             Coord index = B[jj][k1];
             if (!tmpC[index]) {
                 dirtyC[ndirty++]= index;
@@ -1273,7 +794,7 @@ void get_B_fibers(int ii)
 
     // update A access
     if (consistent_A()) {
-        i64 cost = (tmpj - beginA[ii]) * 3;
+        i64 cost = (tmpj - sim.cursor.A.begins[ii - TI]) * 3;
         b32 hitA = (interorder == IJK || interorder == JIK) && (fulltagA == 0 || ii < fullA);
 
         // A[ii] is on the buffer
@@ -1323,7 +844,6 @@ void get_B_fibers(int ii)
                 }
             }
         }
-        bufferedClen[ii]+= deltaC;
         Csizenow        += deltaC;
 
         // overflow! need to offload
@@ -1343,7 +863,6 @@ void get_B_fibers(int ii)
 
             for (int i = TI; i < TI + sim.cfg.iii; i++) {
                 bufferedC[i]    = std::set<int>();
-                bufferedClen[i] = 0;
             }
         }
     } else {
@@ -1384,12 +903,12 @@ bool prefetchrow(int ii) {
     int needsize = 0;
     // FLRU mode; need 2data+1coord+1next pointer (*4)
     if (cacheScheme == 6 || cacheScheme == 7) {
-        needsize = currsizeA[ii] * 4 + 1;
+        needsize = sim.cursor.A.sizes[ii - TI] * 4 + 1;
     }
     // FLFU mode; don't need next pointer (*3)
     // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
     else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
-        needsize = currsizeA[ii] * 3;
+        needsize = sim.cursor.A.sizes[ii - TI] * 3;
     }
 
     // can't prefetch this row now
@@ -1399,7 +918,7 @@ bool prefetchrow(int ii) {
 
     prefetchNow += needsize;
 
-    int tmpj = beginA[ii];
+    int tmpj = sim.cursor.A.begins[ii - TI];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
     // QUESTION(ejs): Observation: if column c in the current A row fiber is non-zero,
@@ -1430,7 +949,7 @@ bool prefetchrow(int ii) {
         if (cacheScheme == CACHE_SCHEME_FLFU) {
 
             long long firstaddr = getCacheAddr(jj, 0);
-            int fibersize = currsizeB[jj] * 3;
+            int fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
             for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NELEMS) {
                 long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NELEMS);
 
@@ -1792,11 +1311,11 @@ void calculate() {
                 // first minus this row's overhead
                 int needsize = 0;
                 if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_SPARCH) {
-                    needsize = currsizeA[TI + ii] * 4 + 1;
+                    needsize = sim.cursor.A.sizes[TI + ii] * 4 + 1;
                 }
                 // FLFU mode; don't need next pointer (*3)
                 if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
-                    needsize = currsizeA[TI + ii] * 3;
+                    needsize = sim.cursor.A.sizes[TI + ii] * 3;
                 }
 
                 if (prefetchNow > needsize) {
@@ -1841,7 +1360,7 @@ void calculate() {
 
             // update C
 
-            int tmpj = beginA[TI + ii];
+            int tmpj = sim.cursor.A.begins[ii];
             int maxj = offsetarrayA[TI + ii + 1] - offsetarrayA[TI + ii];
 
             // tmpc = 0
@@ -1876,7 +1395,7 @@ void calculate() {
         Csizenow = 0;
 
         for (int ii = TI; ii < TI + sim.cfg.iii; ii++) {
-            int tmpj = beginA[ii];
+            int tmpj = sim.cursor.A.begins[ii - TI];
             int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
 
             // tmpc = 0
@@ -1888,7 +1407,7 @@ void calculate() {
                 // coordinate of required B fiber
                 int jj = A[ii][tmpj];
 
-                computePE += currsizeB[jj];
+                computePE += sim.cursor.B.sizes[jj - TJ];
 
                 update_c_fiber(jj);
 
@@ -1944,37 +1463,12 @@ struct simulator_state initialize_simulator(const struct config *cfg)
     try {
         if (bufferedC == nullptr)
             bufferedC = new set<int>[cfg->I]();
-        if (bufferedClen == nullptr)
-            bufferedClen = new int[cfg->I]();
-        if (beginA == nullptr)
-            beginA = new int[cfg->I]();
-        if (beginB == nullptr)
-            beginB = new int[cfg->J]();
-
-        if (beginAc == nullptr)
-            beginAc = new int[cfg->J]();
-        if (beginBc == nullptr)
-            beginBc = new int[cfg->K]();
-
-        // if(begin == nullptr) new int[];
-
-        if (currsizeA == nullptr)
-            currsizeA = new int[cfg->I]();
-        if (currsizeAc == nullptr)
-            currsizeAc = new int[cfg->J]();
-        if (currsizeB == nullptr)
-            currsizeB = new int[cfg->J]();
-        if (currsizeBc == nullptr)
-            currsizeBc = new int[cfg->J]();
-
         if (bufferedsizeB == nullptr)
             bufferedsizeB = new int[cfg->J]();
-
         if (tmpC == nullptr)
             tmpC    = new u8[cfg->K]();
         if (dirtyC == nullptr)
             dirtyC  = new Coord[cfg->K]();
-
         if (LFUtag == nullptr)
             LFUtag = new int[cfg->J]();
         if (nextposvector == nullptr)
@@ -2021,26 +1515,12 @@ void reinitialize() {
     Csizenow = 0;
     for (int i = 0; i < sim.cfg.I; i++) {
         bufferedC[i]    = std::set<int>();
-        bufferedClen[i] = 0;
-    }
-
-    // reinitialize management dtaa
-    for (int ti = 0; ti < sim.cfg.I; ti++) {
-        beginA[ti] = 0;
-    }
-    for (int tj = 0; tj < sim.cfg.J; tj++) {
-        beginAc[tj] = 0;
-        beginB[tj] = 0;
-    }
-    for (int tk = 0; tk < sim.cfg.K; tk++) {
-        beginBc[tk] = 0;
     }
 }
 
 int getcntc(int ii) 
 {
-    // TODO: dirty list fix
-    int tmpj = beginA[ii];
+    int tmpj = sim.cursor.A.begins[ii - TI];
     int maxj = offsetarrayA[ii + 1] - offsetarrayA[ii];
     Coord ndirty = 0;
 
@@ -2052,7 +1532,7 @@ int getcntc(int ii)
         int jj = A[ii][tmpj];
 
         // >> update_c_fiber() inlined
-        for (int k1 = beginB[jj]; k1 < beginB[jj] + currsizeB[jj]; k1++) {
+        for (int k1 = sim.cursor.B.begins[jj - TJ]; k1 < sim.cursor.B.begins[jj - TJ] + sim.cursor.B.sizes[jj - TJ]; k1++) {
             Coord index = B[jj][k1];
             if (!tmpC[index]) {
                 dirtyC[ndirty++]= index;
@@ -2157,45 +1637,21 @@ void run()
     if (sim.cfg.kkk > sim.cfg.K)
         sim.cfg.kkk = sim.cfg.K;
 
-    // reinitialize**: TI/TJ/TK to 0;  put beginA/B to 0
-    reinitialize_outer();
-    do {
+    Coord total_ntiles = sim.cfg.tti*sim.cfg.ttj*sim.cfg.ttk;
+    while (total_ntiles--) {
+        // need to initialize the cache each time change the tile
+        if (ISCACHE) { // FIXME(ejs): seems redundant and slow
+            initializeCacheValid();
+        }
 
-        reinitialize_mid();
-
-        do {
-
-            reinitialize_inner();
-            do {
-                // need to initialize the cache each time change the tile
-                if (ISCACHE) { // FIXME(ejs): seems redundant and slow
-                    initializeCacheValid();
-                }
-
-                // advance_cursor();
-
-                pre_calculate_load();
-
-                updateBlockA();
-                updateBlockB();
-
-                calculate();
-
-                // adddyn
-                // dynamically update the estimate tile here.
-                // don't change the actual TI/TJ/TK(iii, jjj, kkk in the code) here,
-                // only change the _TI/_TJ/_TK(_iii, _jjj, _kkk in the code) here update
-                // the _TI/_TJ/_TK to TI/TJ/TK when actually updating TI/TJ/TK (decide
-                // by the interorder) this means will change immediately when the update
-                // dimension is the inner-most dimension. here we use Tcnt00, Tcnt01,
-                // Tcnt10, Tcnt11 to udpate _TI/_TJ/_TK
-
-            } // update TI/TJ/TK; update beginA/B/C if TI/J/K don't overflow
-            while (iterate_inner_loop());
-
-        } while (iterate_mid_loop());
-
-    } while (iterate_outer_loop());
+        advance_cursor();
+        // sync tile origins
+        TI = sim.cursor.ti * sim.cfg.iii;
+        TJ = sim.cursor.tj * sim.cfg.jjj;
+        TK = sim.cursor.tk * sim.cfg.kkk;
+        pre_calculate_load();
+        calculate();
+    }
 
     postTileMerge();
 

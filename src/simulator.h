@@ -71,10 +71,6 @@ void reinitialize();
 void runTile(int kkk);
 void run();
 
-extern int *currsizeB;
-extern int *currsizeBc;
-extern int *beginB;
-
 extern int TI, TJ, TK;
 
 struct simulator_state initialize_simulator(const struct config *cfg);
