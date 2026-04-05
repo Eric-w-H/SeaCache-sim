@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+import ssgetpy
+
 
 METRIC_PATTERNS = {
     "total_cycle": re.compile(r"total cycle =\s*(\d+)"),
@@ -267,7 +269,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--max-matrices", type=int, default=0, help="Limit number of matrices (0 means no limit)")
     p.add_argument("--profile", choices=["quick", "quick-baseline", "balanced", "full"], default="balanced")
     p.add_argument("--timeout", type=int, default=3600, help="Timeout per run in seconds")
-    p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs, skip simulator runs")
+    p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs + download missing data, skip simulator runs.")
+    p.add_argument("--download-matrices", action="store_true", help="Download missing matrices into {--repo-root}/data")
 
     # Used only when --profile full
     p.add_argument("--transpose-values", default="0")
@@ -314,6 +317,19 @@ def main(argv: Sequence[str]) -> int:
     print(f"  validation issues:  {len(problems)}")
     for item, problem in problems:
         print(f"  - {item}: {problem}")
+
+    if args.download_matrices:
+        for matrix in matrices:
+            if matrix in valid_matrices:
+                continue
+            found = ssgetpy.search(matrix)
+            if len(found) == 1 and not args.dry_run:
+                print(f"Downloading {matrix} into {matrix_roots[0] / matrix}.mtx")
+                found.download('MM', matrix_roots[0], extract=True)
+                valid_matrices.append(matrix)
+            else:
+                print(f"Found {len(found)} candidate {'s' if len(found) > 1 else ''} for {matrix}. Skipping download...")
+                
 
     if not valid_matrices:
         print("No valid matrices found. Exiting.")
