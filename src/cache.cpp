@@ -60,10 +60,18 @@ int cachecycle = 0;
 // whole: load the whole cacheline anyway. partial: only load a part (need more
 // hardware change ) to support partial: need a extra metadata to track whether
 // a fiber is valid. (not very expensive. only one bit per each fiber)
-//                  start addr     exceed part      not full part
+//                  start addr     exceed part      not full part                work
 // cache Scheme 0       fiber       cut                 whole
 // cache Scheme 1       fiber       split               whole
 enum cache_scheme cacheScheme;
+// cache Scheme 4       addr        split               whole
+// cache Scheme 6: scheme 1 + OPT                                                SPARCH
+// cache Scheme 11100: scheme0 + static OPT                                      INNERSP
+// cache Scheme 11101: sceme0 + dynamic OPT                                      SPARCH
+// cache Scheme 66: scheme6 + LFU prefetch + hybrid bit (fewer hardware cost)    SCACHE
+// cache Scheme 88: refers to the practical FLFU (enabling 4-bit, virtual tag)   SCACHE
+//   (virtual tag can be configured or not (baseline)) the flu information is 
+//   no longer kept in the LFUtag, but the extra lfubit
 
 long long getCacheAddr(int fiberid, int relative) {
     long long ret;
