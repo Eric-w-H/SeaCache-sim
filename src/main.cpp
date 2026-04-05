@@ -79,7 +79,7 @@ void parse_matrix(FILE *f, struct matrix *x)
         // assert(sscanf(readbuffer, "%lu %lu %lf %lf", &xx, &yy, &zz, &lala) >= 2);
         static_assert(sizeof(Coord) == sizeof(u64) || sizeof(Coord) == sizeof(u32), "unsupported Coord size");
         switch (sizeof(Coord)) {
-        case sizeof(u64): assert(sscanf(readbuffer, "%llu %llu", &xx, &yy) == 2);   break;
+        case sizeof(u64): assert(sscanf(readbuffer, "%u %u", &xx, &yy) == 2);   break;
         case sizeof(u32): assert(sscanf(readbuffer, "%u %u", &xx, &yy) == 2);       break;
         }
 
@@ -272,8 +272,8 @@ int main(int argc, char *argv[])
     assert(matrix2_file);
     assert(freopen(output_filepath.c_str(), "w", stdout));
 
-    struct matrix matA = {0};
-    struct matrix matB = {0};
+    struct matrix matA;
+    struct matrix matB;
     {
         #define TEMP_BUFFER_NBYTES 1024
         char buf[TEMP_BUFFER_NBYTES];
@@ -283,14 +283,14 @@ int main(int argc, char *argv[])
             if (buf[0] != '%')
                 break;
         }
-        sscanf(buf, "%llu%llu%llu", &matA.nrows, &matA.ncols, &matA.nzM);
+        sscanf(buf, "%u%u%u", &matA.nrows, &matA.ncols, &matA.nzM);
 
         // read and ignore annotation '%' lines
         while (fgets(buf, TEMP_BUFFER_NBYTES, matrix2_file)) {
             if (buf[0] != '%')
                 break;
         }
-        sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
+        sscanf(buf, "%u%u%u", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
     matA.transpose = (b16)transpose;
@@ -309,7 +309,7 @@ int main(int argc, char *argv[])
         char buf[TEMP_BUFFER_NBYTES];
 
         assert(fgets(buf, TEMP_BUFFER_NBYTES, tile_file));
-        assert(sscanf(buf, "%llu%llu%llu", &t_i, &t_j, &t_k) == 3);
+        assert(sscanf(buf, "%u%u%u", &t_i, &t_j, &t_k) == 3);
     }
 
     const struct config cfg = {
@@ -320,12 +320,12 @@ int main(int argc, char *argv[])
         .I          = matA.nrows,
         .J          = matA.ncols,
         .K          = matB.ncols,
-        .iii        = t_i,
-        .jjj        = t_j,
-        .kkk        = t_k,
         .tti        = div_rup(matA.nrows, t_i),
         .ttj        = div_rup(matA.ncols, t_j),
         .ttk        = div_rup(matB.ncols, t_k),
+        .iii        = t_i,
+        .jjj        = t_j,
+        .kkk        = t_k,
     };
     sim = initialize_simulator(&cfg);
     
@@ -375,12 +375,12 @@ int main(int argc, char *argv[])
     long long totaltagmatch48 = 0;
     long long totaltagmatch16 = 0;
 
-    for (int i = 1; i < sim.cfg.I; i++) {
+    for (uint32_t i = 1; i < sim.cfg.I; i++) {
         Coord size_im1 = offsetarrayA[i] - offsetarrayA[i-1];
         if (size_im1 < 48) {
             totalempty += (48 - size_im1);
         }
-        totalincache    += min(48, size_im1);
+        totalincache    += min(48u, size_im1);
         totaltagmatch48 += div_rup(size_im1, 48);
         totaltagmatch16 += div_rup(size_im1, 16);
     }
@@ -493,14 +493,14 @@ int main(int argc, char *argv[])
 
     /******************Config************************************/
 
-    printf("Matrix A: %llu x %llu, number of non-zeros = %llu\n", matA.nrows, matA.ncols, matA.nzM);
+    printf("Matrix A: %u x %u, number of non-zeros = %u\n", matA.nrows, matA.ncols, matA.nzM);
     printf("*** ratio of empty %lf, ratio of not empty %lf\n", totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
     printf("*** ratio of in cache %lf\n", totalincache / ((f64)matA.nzM));
     printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch48));
     printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch16));
-    printf("Matrix B: %llu x %llu, number of non-zeros = %llu\n", matB.nrows, matB.ncols, matB.nzM);
+    printf("Matrix B: %u x %u, number of non-zeros = %u\n", matB.nrows, matB.ncols, matB.nzM);
     printf("transpose: %d\n", matB.transpose);
-    printf("I = %llu, K = %llu, J = %llu\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
+    printf("I = %u, K = %u, J = %u\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
     /************************************************************/
 
     getParameter(); // sets estEffMAC
@@ -513,7 +513,7 @@ int main(int argc, char *argv[])
         // EWH
         // Incorporate SeaCache into baseline
         puts("***************** SeaCache *******************");
-        printf("nnzB:%llu  K:%llu  J/TJ:%llu  nzlB:%llu\n",
+        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
             matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
             matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
         );

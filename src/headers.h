@@ -1,6 +1,7 @@
 #ifndef HEADERS_H
 #define HEADERS_H
 
+#include <concepts>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -33,11 +34,8 @@ typedef int8_t      b8;
 
 typedef uint32_t    Coord;
 
-
-#define div_rup(a, b)   (((a) + (b) - 1) / (b)) // round-up integer divide, uint over non-zero uint
-#define min(a, b)       ((a) < (b) ? (a) : (b))
-#define max(a, b)       ((a) > (b) ? (a) : (b))
-
+template<typename A, typename B>
+auto div_rup(A a, B b) -> decltype(a/b) { return (a + b - 1) / b; }
 
 #include "config.h"
 #include "data.h"

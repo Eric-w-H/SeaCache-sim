@@ -128,6 +128,13 @@ def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
             ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False),
         ]
 
+    if args.profile == "quick-baseline":
+        return [
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False),
+        ]
+
     if args.profile == "balanced":
         return [
             ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False),
@@ -258,7 +265,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--results-csv", default="./output/collected_results.csv", help="CSV file for extracted metrics")
     p.add_argument("--matrices", default="", help="Comma-separated matrix names (default: discover from tiles)")
     p.add_argument("--max-matrices", type=int, default=0, help="Limit number of matrices (0 means no limit)")
-    p.add_argument("--profile", choices=["quick", "balanced", "full"], default="balanced")
+    p.add_argument("--profile", choices=["quick", "quick-baseline", "balanced", "full"], default="balanced")
     p.add_argument("--timeout", type=int, default=3600, help="Timeout per run in seconds")
     p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs, skip simulator runs")
 
