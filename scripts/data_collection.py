@@ -81,10 +81,10 @@ def discover_matrices(tile_dir: Path) -> List[str]:
 
 def matrix_file_path(matrix: str, roots: Sequence[Path]) -> Optional[Path]:
     for root in roots:
-        if root.name == "largedata":
-            candidate = root / matrix / f"{matrix}.mtx"
-        else:
-            candidate = root / f"{matrix}.mtx"
+        candidate = root / f"{matrix}.mtx"
+        if candidate.exists():
+            return candidate
+        candidate = root / matrix / f"{matrix}.mtx"
         if candidate.exists():
             return candidate
     return None
