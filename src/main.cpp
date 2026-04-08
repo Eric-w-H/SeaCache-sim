@@ -13,6 +13,7 @@ This branch fixes a "read one past end of array allocation" bug for offsetarrayA
 #include "simulator.h"
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 
 struct Arena *global_persist;
 struct Arena *global_temp;
@@ -40,6 +41,31 @@ i32 cmp_coord(const void *a, const void *b)
     Coord x = *(const Coord *)a;
     Coord y = *(const Coord *)b;
     return (x > y) - (x < y);
+}
+
+std::string get_matrix_path(const std::string& matrix_name) {
+    std::string relative_roots[] = {
+        "./data/",
+        "./largedata/",
+        "./dense/",
+        "./bfs/"
+    };
+
+    for (auto& root : relative_roots) {
+        // test root/name.mtx
+        {
+          std::filesystem::path candidate{root + matrix_name + ".mtx"};
+          if(std::filesystem::exists(candidate)) return candidate;
+	}
+
+	// test root/name/name.mtx
+	{
+          std::filesystem::path candidate{root + matrix_name + '/' + matrix_name + ".mtx"};
+          if(std::filesystem::exists(candidate)) return candidate;
+	}
+    }
+    std::cerr << "Error: " << matrix_name << " not found.\n";
+    std::exit(1);
 }
 
 void parse_matrix(FILE *f, struct matrix *x)
@@ -253,8 +279,8 @@ int main(int argc, char *argv[])
     int tmpbank = config["srambank"].get<int>();
     sramBank = tmpbank;
 
-    std::string matrix1_filepath = "data/" + matrix1_name + ".mtx";
-    std::string matrix2_filepath = "data/" + matrix2_name + ".mtx";
+    std::string matrix1_filepath = get_matrix_path(matrix1_name);
+    std::string matrix2_filepath = get_matrix_path(matrix2_name);
     std::string output_filepath = output_dir
         +   (1 ? "C" : "_") // +   (ISCACHE ? "C" : "_")
         +   printDataFlow[dataflow]
