@@ -35,6 +35,640 @@ struct matrix {
     Coord *offsetarrayM, *offsetarrayMc;
 };
 
+struct tile_cost_features {
+    f64 sparse_cost;
+    f64 dense_cost;
+    f64 c_nnz_estimate;
+    f64 c_density_estimate;
+    Coord row_count;
+    Coord j_count;
+    Coord k_count;
+    Coord ti, tj, tk;
+};
+
+struct policy_region_features {
+    f64 sparse_cost;
+    f64 dense_cost;
+    f64 c_nnz_estimate;
+    f64 c_density_estimate;
+    Coord tile_count;
+    Coord ti, tj, tk;
+};
+
+static enum workload_mode parse_workload_mode(const json &config)
+{
+    if (!config.contains("workloadMode"))
+        return WORKLOAD_MODE_AUTO;
+
+    const std::string mode = config["workloadMode"].get<std::string>();
+    if (mode == "auto")
+        return WORKLOAD_MODE_AUTO;
+    if (mode == "sparse")
+        return WORKLOAD_MODE_SPARSE;
+    if (mode == "dense")
+        return WORKLOAD_MODE_DENSE;
+
+    std::cerr << "Unsupported workloadMode: " << mode << std::endl;
+    std::exit(1);
+}
+
+static const char *print_workload_mode(enum workload_mode mode)
+{
+    switch (mode) {
+    case WORKLOAD_MODE_AUTO:   return "auto";
+    case WORKLOAD_MODE_SPARSE: return "sparse";
+    case WORKLOAD_MODE_DENSE:  return "dense";
+    case WORKLOAD_MODE_MIXED:  return "mixed";
+    }
+    return "unknown";
+}
+
+static inline Coord tile_linear_idx(Coord major_tile, Coord minor_tile, Coord minor_ntiles)
+{
+    return major_tile * minor_ntiles + minor_tile;
+}
+
+static inline Coord triple_tile_linear_idx(const struct config *cfg, Coord ti, Coord tj, Coord tk)
+{
+    return (ti * cfg->ttj + tj) * cfg->ttk + tk;
+}
+
+static struct matrix_characterization characterize_matrix(const struct matrix *x, Coord tile_rows, Coord tile_cols)
+{
+    struct matrix_characterization stats = {0};
+    if (x->nrows == 0 || x->ncols == 0)
+        return stats;
+
+    const f64 total_slots = static_cast<f64>(x->nrows) * static_cast<f64>(x->ncols);
+    stats.density = total_slots == 0.0 ? 0.0 : static_cast<f64>(x->nzM) / total_slots;
+
+    f64 sum = 0.0;
+    f64 sum_sq = 0.0;
+    Coord empty_rows = 0;
+    for (Coord row = 0; row < x->nrows; ++row) {
+        Coord row_nnz = x->offsetarrayM[row + 1] - x->offsetarrayM[row];
+        sum += row_nnz;
+        sum_sq += static_cast<f64>(row_nnz) * row_nnz;
+        empty_rows += row_nnz == 0;
+    }
+
+    stats.mean_row_nnz = sum / x->nrows;
+    const f64 mean_sq = sum_sq / x->nrows;
+    const f64 variance = max(0.0, mean_sq - stats.mean_row_nnz * stats.mean_row_nnz);
+    stats.row_nnz_stddev = std::sqrt(variance);
+    stats.empty_row_ratio = static_cast<f64>(empty_rows) / x->nrows;
+
+    if (tile_rows == 0 || tile_cols == 0) {
+        stats.tile_fill_ratio = stats.density;
+    } else {
+        const Coord tile_nrows = div_rup(x->nrows, tile_rows);
+        const Coord tile_ncols = div_rup(x->ncols, tile_cols);
+        std::vector<Coord> tile_nnz(tile_nrows * tile_ncols, 0);
+        for (Coord row = 0; row < x->nrows; ++row) {
+            const Coord tile_row = row / tile_rows;
+            for (Coord idx = x->offsetarrayM[row]; idx < x->offsetarrayM[row + 1]; ++idx) {
+                const Coord col = x->M[row][idx - x->offsetarrayM[row]];
+                const Coord tile_col = col / tile_cols;
+                ++tile_nnz[tile_row * tile_ncols + tile_col];
+            }
+        }
+
+        f64 tile_fill_sum = 0.0;
+        for (Coord tile_row = 0; tile_row < tile_nrows; ++tile_row) {
+            const Coord rows_in_tile = min(tile_rows, x->nrows - tile_row * tile_rows);
+            for (Coord tile_col = 0; tile_col < tile_ncols; ++tile_col) {
+                const Coord cols_in_tile = min(tile_cols, x->ncols - tile_col * tile_cols);
+                const f64 tile_slots = static_cast<f64>(rows_in_tile) * cols_in_tile;
+                const Coord nnz = tile_nnz[tile_row * tile_ncols + tile_col];
+                tile_fill_sum += tile_slots == 0.0 ? 0.0 : static_cast<f64>(nnz) / tile_slots;
+            }
+        }
+        stats.tile_fill_ratio = tile_fill_sum / (tile_nrows * tile_ncols);
+    }
+
+    stats.is_dense_candidate =
+        (stats.density >= 0.18) ||
+        (stats.tile_fill_ratio >= 0.30 && stats.empty_row_ratio <= 0.10) ||
+        (stats.mean_row_nnz >= tile_cols * 0.50 && tile_cols > 0);
+    return stats;
+}
+
+static std::vector<struct tile_characterization> characterize_matrix_tiles(
+    const struct matrix *x,
+    Coord tile_rows,
+    Coord tile_cols)
+{
+    if (tile_rows == 0 || tile_cols == 0)
+        return {};
+
+    const Coord tile_nrows = div_rup(x->nrows, tile_rows);
+    const Coord tile_ncols = div_rup(x->ncols, tile_cols);
+    std::vector<struct tile_characterization> tiles(tile_nrows * tile_ncols, {0});
+
+    for (Coord row = 0; row < x->nrows; ++row) {
+        const Coord tile_row = row / tile_rows;
+        Coord prev_tile_col = (Coord)-1;
+        for (Coord idx = x->offsetarrayM[row]; idx < x->offsetarrayM[row + 1]; ++idx) {
+            const Coord col = x->M[row][idx - x->offsetarrayM[row]];
+            const Coord tile_col = col / tile_cols;
+            const Coord tile_idx = tile_linear_idx(tile_row, tile_col, tile_ncols);
+            ++tiles[tile_idx].nnz;
+            if (tile_col != prev_tile_col) {
+                ++tiles[tile_idx].active_major_count;
+                prev_tile_col = tile_col;
+            }
+        }
+    }
+
+    for (Coord tile_row = 0; tile_row < tile_nrows; ++tile_row) {
+        const Coord rows_in_tile = min(tile_rows, x->nrows - tile_row * tile_rows);
+        for (Coord tile_col = 0; tile_col < tile_ncols; ++tile_col) {
+            const Coord cols_in_tile = min(tile_cols, x->ncols - tile_col * tile_cols);
+            const Coord tile_idx = tile_linear_idx(tile_row, tile_col, tile_ncols);
+            const f64 tile_slots = static_cast<f64>(rows_in_tile) * cols_in_tile;
+            tiles[tile_idx].fill_ratio =
+                tile_slots == 0.0 ? 0.0 : static_cast<f64>(tiles[tile_idx].nnz) / tile_slots;
+        }
+    }
+
+    return tiles;
+}
+
+static inline f64 estimate_sparse_tile_cost(
+    const struct tile_characterization &a_tile,
+    const struct tile_characterization &b_tile,
+    Coord row_count,
+    Coord j_count,
+    Coord k_count,
+    f64 c_est,
+    f64 c_density)
+{
+    const f64 avg_b_fiber =
+        static_cast<f64>(b_tile.nnz) / max((Coord)1, b_tile.active_major_count);
+    const f64 sparse_mac = static_cast<f64>(a_tile.nnz) * max(1.0, avg_b_fiber);
+    const f64 metadata_penalty =
+        (1.0 - a_tile.fill_ratio) * row_count +
+        (1.0 - b_tile.fill_ratio) * k_count +
+        (j_count * 0.25);
+    const f64 scatter_penalty =
+        c_est * (0.20 + 0.40 * c_density) +
+        max(0.0, c_est - static_cast<f64>(a_tile.active_major_count)) * 0.08;
+    return sparse_mac + (a_tile.nnz + b_tile.nnz) + scatter_penalty + metadata_penalty;
+}
+
+static inline f64 estimate_dense_tile_cost(
+    const struct tile_characterization &a_tile,
+    const struct tile_characterization &b_tile,
+    Coord row_count,
+    Coord j_count,
+    Coord k_count,
+    f64 c_est,
+    f64 c_density)
+{
+    const f64 words_j = div_rup(j_count, (Coord)64);
+    const f64 dense_kernel = static_cast<f64>(row_count) * k_count * words_j;
+    const f64 bitset_build = a_tile.nnz + b_tile.nnz;
+    const f64 bitset_probe =
+        c_est * (0.04 + 0.06 * (1.0 - c_density));
+    const f64 scan_penalty =
+        (row_count + k_count) * words_j * 0.5 +
+        (1.0 - 0.5 * (a_tile.fill_ratio + b_tile.fill_ratio)) * j_count;
+    return dense_kernel + bitset_build + bitset_probe + scan_penalty;
+}
+
+static inline f64 estimate_c_tile_nnz(
+    const struct tile_characterization &a_tile,
+    const struct tile_characterization &b_tile,
+    Coord row_count,
+    Coord j_count,
+    Coord k_count)
+{
+    if (row_count == 0 || j_count == 0 || k_count == 0 || a_tile.nnz == 0 || b_tile.nnz == 0)
+        return 0.0;
+
+    const f64 a_fill = static_cast<f64>(a_tile.nnz) / max(1.0, static_cast<f64>(row_count) * j_count);
+    const f64 b_fill = static_cast<f64>(b_tile.nnz) / max(1.0, static_cast<f64>(j_count) * k_count);
+    const f64 expected_overlap = a_fill * b_fill * j_count;
+    const f64 row_activity =
+        static_cast<f64>(a_tile.active_major_count) / max<Coord>(1, row_count);
+    const f64 shared_activity =
+        static_cast<f64>(b_tile.active_major_count) / max<Coord>(1, j_count);
+    const f64 activation_prob =
+        (1.0 - std::exp(-expected_overlap)) * (0.35 + 0.65 * row_activity) * (0.25 + 0.75 * shared_activity);
+    const f64 dense_cap = static_cast<f64>(row_count) * k_count;
+    const f64 sparse_mac_cap =
+        min(static_cast<f64>(a_tile.nnz) * max(1.0, static_cast<f64>(b_tile.nnz) / max<Coord>(1, b_tile.active_major_count)),
+            dense_cap);
+    return min(dense_cap, min(dense_cap * min(1.0, activation_prob), sparse_mac_cap));
+}
+
+static inline f64 transition_penalty(
+    enum workload_mode prev_mode,
+    enum workload_mode next_mode,
+    const struct tile_cost_features &prev_tile,
+    const struct tile_cost_features &next_tile,
+    f64 base_penalty)
+{
+    if (prev_mode == next_mode)
+        return 0.0;
+
+    const f64 words_j = div_rup(next_tile.j_count, (Coord)64);
+    const f64 locality_delta =
+        std::abs(prev_tile.c_density_estimate - next_tile.c_density_estimate) * (next_tile.row_count + next_tile.k_count) +
+        std::abs(prev_tile.c_nnz_estimate - next_tile.c_nnz_estimate) * 0.02;
+    const b16 same_i = prev_tile.ti == next_tile.ti;
+    const b16 same_j = prev_tile.tj == next_tile.tj;
+    const f64 reuse_disruption = (same_i ? next_tile.row_count * 0.20 : 0.0) + (same_j ? next_tile.j_count * 0.35 : 0.0);
+
+    if (prev_mode == WORKLOAD_MODE_SPARSE && next_mode == WORKLOAD_MODE_DENSE) {
+        const f64 dense_setup =
+            (next_tile.row_count + next_tile.k_count) * words_j * 0.70 +
+            next_tile.c_nnz_estimate * 0.10;
+        return base_penalty * 0.55 + dense_setup + locality_delta + reuse_disruption;
+    }
+
+    const f64 dense_teardown =
+        prev_tile.c_nnz_estimate * 0.12 +
+        prev_tile.k_count * 0.45 +
+        prev_tile.c_density_estimate * prev_tile.row_count * 0.25;
+    return base_penalty * 0.45 + dense_teardown + locality_delta + reuse_disruption;
+}
+
+static std::vector<enum workload_mode> build_tile_mode_map(
+    const struct config *cfg,
+    const struct matrix_characterization &a_stats,
+    const struct matrix_characterization &b_stats,
+    const std::vector<struct tile_characterization> &a_tiles,
+    const std::vector<struct tile_characterization> &b_tiles,
+    Coord *policy_span_ti_out,
+    Coord *policy_span_tj_out,
+    Coord *policy_span_tk_out,
+    Coord *sparse_region_count_out,
+    Coord *dense_region_count_out,
+    f64 *sparse_cost_out,
+    f64 *dense_cost_out,
+    f64 *mixed_cost_out)
+{
+    const Coord total_tiles = cfg->tti * cfg->ttj * cfg->ttk;
+    std::vector<f64> sparse_cost(total_tiles, 0.0);
+    std::vector<f64> dense_cost(total_tiles, 0.0);
+    std::vector<struct tile_cost_features> tile_features(total_tiles);
+
+    f64 force_sparse_cost = 0.0;
+    f64 force_dense_cost = 0.0;
+    for (Coord ti = 0; ti < cfg->tti; ++ti) {
+        const Coord row_count = min(cfg->iii, cfg->I - ti * cfg->iii);
+        for (Coord tj = 0; tj < cfg->ttj; ++tj) {
+            const Coord j_count = min(cfg->jjj, cfg->J - tj * cfg->jjj);
+            const struct tile_characterization &a_tile =
+                a_tiles[tile_linear_idx(ti, tj, cfg->ttj)];
+            for (Coord tk = 0; tk < cfg->ttk; ++tk) {
+                const Coord k_count = min(cfg->kkk, cfg->K - tk * cfg->kkk);
+                const struct tile_characterization &b_tile =
+                    b_tiles[tile_linear_idx(tj, tk, cfg->ttk)];
+                const Coord tile_idx = triple_tile_linear_idx(cfg, ti, tj, tk);
+                const f64 c_est = estimate_c_tile_nnz(a_tile, b_tile, row_count, j_count, k_count);
+                const f64 c_density =
+                    c_est / max(1.0, static_cast<f64>(row_count) * k_count);
+                sparse_cost[tile_idx] =
+                    estimate_sparse_tile_cost(a_tile, b_tile, row_count, j_count, k_count, c_est, c_density);
+                dense_cost[tile_idx] =
+                    estimate_dense_tile_cost(a_tile, b_tile, row_count, j_count, k_count, c_est, c_density);
+                tile_features[tile_idx] = {
+                    .sparse_cost = sparse_cost[tile_idx],
+                    .dense_cost = dense_cost[tile_idx],
+                    .c_nnz_estimate = c_est,
+                    .c_density_estimate = c_density,
+                    .row_count = row_count,
+                    .j_count = j_count,
+                    .k_count = k_count,
+                    .ti = ti,
+                    .tj = tj,
+                    .tk = tk,
+                };
+                force_sparse_cost += sparse_cost[tile_idx];
+                force_dense_cost += dense_cost[tile_idx];
+            }
+        }
+    }
+
+    std::vector<struct policy_region_features> regions;
+    std::vector<Coord> tile_region_ids(total_tiles, 0);
+    const f64 avg_density = 0.5 * (a_stats.density + b_stats.density);
+    const Coord max_region_tiles =
+        avg_density < 0.05 ? 8 :
+        (avg_density < 0.25 ? 4 : 2);
+    const f64 preference_similarity_threshold = 0.12;
+    const f64 c_density_similarity_threshold = 0.08;
+    const f64 strong_preference_discontinuity = 0.28;
+    const f64 strong_c_density_discontinuity = 0.14;
+    const f64 dense_growth_margin = 0.10;
+    const f64 sparse_growth_margin = 0.04;
+
+    auto dense_preference = [](const struct tile_cost_features &f) {
+        return (f.sparse_cost - f.dense_cost) / max(1.0, f.sparse_cost + f.dense_cost);
+    };
+
+    for (Coord tile_idx = 0; tile_idx < total_tiles; ++tile_idx) {
+        const struct tile_cost_features &tile = tile_features[tile_idx];
+        if (regions.empty()) {
+            regions.push_back({
+                .sparse_cost = tile.sparse_cost,
+                .dense_cost = tile.dense_cost,
+                .c_nnz_estimate = tile.c_nnz_estimate,
+                .c_density_estimate = tile.c_density_estimate,
+                .tile_count = 1,
+                .ti = tile.ti,
+                .tj = tile.tj,
+                .tk = tile.tk,
+            });
+            tile_region_ids[tile_idx] = 0;
+            continue;
+        }
+
+        struct policy_region_features &region = regions.back();
+        const f64 region_preference =
+            (region.sparse_cost - region.dense_cost) / max(1.0, region.sparse_cost + region.dense_cost);
+        const f64 tile_preference = dense_preference(tile);
+        const b16 same_mode_preference =
+            (region_preference >= 0.0 && tile_preference >= 0.0) ||
+            (region_preference < 0.0 && tile_preference < 0.0);
+        const b16 same_i = region.ti == tile.ti;
+        const f64 region_avg_c_density =
+            region.c_density_estimate / max((Coord)1, region.tile_count);
+        const b16 close_preference =
+            std::abs(region_preference - tile_preference) <= preference_similarity_threshold;
+        const b16 close_c_density =
+            std::abs(region_avg_c_density - tile.c_density_estimate)
+            <= c_density_similarity_threshold;
+        const b16 strong_discontinuity =
+            std::abs(region_preference - tile_preference) >= strong_preference_discontinuity ||
+            std::abs(region_avg_c_density - tile.c_density_estimate) >= strong_c_density_discontinuity;
+        const b16 dense_region = region_preference > 0.0;
+        const b16 tile_dense = tile_preference > 0.0;
+        const b16 dense_growth_allowed =
+            dense_region && tile_dense &&
+            region_preference >= dense_growth_margin &&
+            tile_preference >= dense_growth_margin;
+        const b16 sparse_growth_allowed =
+            !dense_region && !tile_dense &&
+            region_preference <= -sparse_growth_margin &&
+            tile_preference <= -sparse_growth_margin;
+        const b16 same_tj = region.tj == tile.tj;
+        const b16 boundary_friendly =
+            same_tj || (!dense_region && !tile_dense);
+
+        if (same_i && same_mode_preference && !strong_discontinuity &&
+            close_preference && close_c_density && boundary_friendly &&
+            (dense_growth_allowed || sparse_growth_allowed) &&
+            region.tile_count < max_region_tiles) {
+            region.sparse_cost += tile.sparse_cost;
+            region.dense_cost += tile.dense_cost;
+            region.c_nnz_estimate += tile.c_nnz_estimate;
+            region.c_density_estimate += tile.c_density_estimate;
+            region.tile_count += 1;
+            tile_region_ids[tile_idx] = regions.size() - 1;
+        } else {
+            regions.push_back({
+                .sparse_cost = tile.sparse_cost,
+                .dense_cost = tile.dense_cost,
+                .c_nnz_estimate = tile.c_nnz_estimate,
+                .c_density_estimate = tile.c_density_estimate,
+                .tile_count = 1,
+                .ti = tile.ti,
+                .tj = tile.tj,
+                .tk = tile.tk,
+            });
+            tile_region_ids[tile_idx] = regions.size() - 1;
+        }
+    }
+
+    const Coord total_regions = regions.size();
+    for (struct policy_region_features &region : regions) {
+        if (region.tile_count) {
+            region.c_density_estimate /= region.tile_count;
+            const f64 reuse_savings =
+                (region.tile_count - 1) *
+                (region.c_nnz_estimate / max((Coord)1, region.tile_count) * 0.06 +
+                 region.c_density_estimate * 18.0);
+            region.dense_cost = max(region.dense_cost - reuse_savings, 0.0);
+        }
+    }
+
+    std::vector<f64> dp_sparse(total_regions, 0.0);
+    std::vector<f64> dp_dense(total_regions, 0.0);
+    std::vector<u8> prev_sparse(total_regions, WORKLOAD_MODE_SPARSE);
+    std::vector<u8> prev_dense(total_regions, WORKLOAD_MODE_DENSE);
+    std::vector<enum workload_mode> tile_modes(total_tiles, WORKLOAD_MODE_SPARSE);
+
+    const f64 switch_penalty =
+        0.010 * ((force_sparse_cost + force_dense_cost) / max((Coord)1, total_regions));
+
+    dp_sparse[0] = regions[0].sparse_cost;
+    dp_dense[0] = regions[0].dense_cost;
+    prev_sparse[0] = WORKLOAD_MODE_SPARSE;
+    prev_dense[0] = WORKLOAD_MODE_DENSE;
+
+    for (Coord region_idx = 1; region_idx < total_regions; ++region_idx) {
+        const f64 dense_to_sparse_penalty = transition_penalty(
+            WORKLOAD_MODE_DENSE,
+            WORKLOAD_MODE_SPARSE,
+            {
+                .sparse_cost = regions[region_idx - 1].sparse_cost,
+                .dense_cost = regions[region_idx - 1].dense_cost,
+                .c_nnz_estimate = regions[region_idx - 1].c_nnz_estimate,
+                .c_density_estimate = regions[region_idx - 1].c_density_estimate,
+                .row_count = 0,
+                .j_count = 0,
+                .k_count = 0,
+                .ti = regions[region_idx - 1].ti,
+                .tj = regions[region_idx - 1].tj,
+                .tk = regions[region_idx - 1].tk,
+            },
+            {
+                .sparse_cost = regions[region_idx].sparse_cost,
+                .dense_cost = regions[region_idx].dense_cost,
+                .c_nnz_estimate = regions[region_idx].c_nnz_estimate,
+                .c_density_estimate = regions[region_idx].c_density_estimate,
+                .row_count = 0,
+                .j_count = 0,
+                .k_count = 0,
+                .ti = regions[region_idx].ti,
+                .tj = regions[region_idx].tj,
+                .tk = regions[region_idx].tk,
+            },
+            switch_penalty);
+        const f64 sparse_to_dense_penalty = transition_penalty(
+            WORKLOAD_MODE_SPARSE,
+            WORKLOAD_MODE_DENSE,
+            {
+                .sparse_cost = regions[region_idx - 1].sparse_cost,
+                .dense_cost = regions[region_idx - 1].dense_cost,
+                .c_nnz_estimate = regions[region_idx - 1].c_nnz_estimate,
+                .c_density_estimate = regions[region_idx - 1].c_density_estimate,
+                .row_count = 0,
+                .j_count = 0,
+                .k_count = 0,
+                .ti = regions[region_idx - 1].ti,
+                .tj = regions[region_idx - 1].tj,
+                .tk = regions[region_idx - 1].tk,
+            },
+            {
+                .sparse_cost = regions[region_idx].sparse_cost,
+                .dense_cost = regions[region_idx].dense_cost,
+                .c_nnz_estimate = regions[region_idx].c_nnz_estimate,
+                .c_density_estimate = regions[region_idx].c_density_estimate,
+                .row_count = 0,
+                .j_count = 0,
+                .k_count = 0,
+                .ti = regions[region_idx].ti,
+                .tj = regions[region_idx].tj,
+                .tk = regions[region_idx].tk,
+            },
+            switch_penalty);
+        const f64 stay_sparse = dp_sparse[region_idx - 1] + regions[region_idx].sparse_cost;
+        const f64 switch_to_sparse =
+            dp_dense[region_idx - 1] + dense_to_sparse_penalty + regions[region_idx].sparse_cost;
+        if (stay_sparse <= switch_to_sparse) {
+            dp_sparse[region_idx] = stay_sparse;
+            prev_sparse[region_idx] = WORKLOAD_MODE_SPARSE;
+        } else {
+            dp_sparse[region_idx] = switch_to_sparse;
+            prev_sparse[region_idx] = WORKLOAD_MODE_DENSE;
+        }
+
+        const f64 stay_dense = dp_dense[region_idx - 1] + regions[region_idx].dense_cost;
+        const f64 switch_to_dense =
+            dp_sparse[region_idx - 1] + sparse_to_dense_penalty + regions[region_idx].dense_cost;
+        if (stay_dense <= switch_to_dense) {
+            dp_dense[region_idx] = stay_dense;
+            prev_dense[region_idx] = WORKLOAD_MODE_DENSE;
+        } else {
+            dp_dense[region_idx] = switch_to_dense;
+            prev_dense[region_idx] = WORKLOAD_MODE_SPARSE;
+        }
+    }
+
+    enum workload_mode mode =
+        (dp_dense[total_regions - 1] < dp_sparse[total_regions - 1])
+            ? WORKLOAD_MODE_DENSE
+            : WORKLOAD_MODE_SPARSE;
+    std::vector<enum workload_mode> region_modes(total_regions, WORKLOAD_MODE_SPARSE);
+    for (Coord region_idx = total_regions; region_idx-- > 0;) {
+        region_modes[region_idx] = mode;
+        if (region_idx == 0)
+            break;
+        mode = (region_modes[region_idx] == WORKLOAD_MODE_SPARSE)
+            ? (enum workload_mode)prev_sparse[region_idx]
+            : (enum workload_mode)prev_dense[region_idx];
+    }
+
+    for (Coord tile_idx = 0; tile_idx < total_tiles; ++tile_idx) {
+        tile_modes[tile_idx] = region_modes[tile_region_ids[tile_idx]];
+    }
+
+    for (enum workload_mode region_mode : region_modes) {
+        *dense_region_count_out += region_mode == WORKLOAD_MODE_DENSE;
+        *sparse_region_count_out += region_mode == WORKLOAD_MODE_SPARSE;
+    }
+
+    *policy_span_ti_out = 0;
+    *policy_span_tj_out = 0;
+    *policy_span_tk_out = 0;
+    *sparse_cost_out = force_sparse_cost;
+    *dense_cost_out = force_dense_cost;
+    *mixed_cost_out = min(dp_sparse[total_regions - 1], dp_dense[total_regions - 1]);
+    return tile_modes;
+}
+
+static struct workload_characterization characterize_workload(
+    enum workload_mode requested_mode,
+    const struct matrix *matA,
+    const struct matrix *matB,
+    const struct config *cfg)
+{
+    struct workload_characterization result = {
+        .requested_mode = requested_mode,
+        .selected_mode = WORKLOAD_MODE_SPARSE,
+    };
+
+    result.A = characterize_matrix(matA, cfg->iii, cfg->jjj);
+    result.B = characterize_matrix(matB, cfg->jjj, cfg->kkk);
+    result.A_tiles = characterize_matrix_tiles(matA, cfg->iii, cfg->jjj);
+    result.B_tiles = characterize_matrix_tiles(matB, cfg->jjj, cfg->kkk);
+    result.tile_modes.resize(cfg->tti * cfg->ttj * cfg->ttk, WORKLOAD_MODE_SPARSE);
+
+    if (requested_mode == WORKLOAD_MODE_SPARSE) {
+        result.selected_mode = WORKLOAD_MODE_SPARSE;
+        std::fill(result.tile_modes.begin(), result.tile_modes.end(), WORKLOAD_MODE_SPARSE);
+        result.sparse_tile_count = result.tile_modes.size();
+        result.decision_reason = "forced sparse mode";
+        return result;
+    }
+    if (requested_mode == WORKLOAD_MODE_DENSE) {
+        result.selected_mode = WORKLOAD_MODE_DENSE;
+        std::fill(result.tile_modes.begin(), result.tile_modes.end(), WORKLOAD_MODE_DENSE);
+        result.dense_tile_count = result.tile_modes.size();
+        result.decision_reason = "forced dense mode";
+        return result;
+    }
+
+    const f64 avg_density = 0.5 * (result.A.density + result.B.density);
+    const f64 avg_tile_fill = 0.5 * (result.A.tile_fill_ratio + result.B.tile_fill_ratio);
+    const f64 sparse_score =
+        (1.0 - result.A.density) +
+        (1.0 - result.B.density) +
+        result.A.empty_row_ratio +
+        result.B.empty_row_ratio +
+        avg_density * 1.5 +
+        (result.A.row_nnz_stddev / max(1.0, result.A.mean_row_nnz + 1.0)) +
+        (result.B.row_nnz_stddev / max(1.0, result.B.mean_row_nnz + 1.0));
+    const f64 dense_score =
+        (1.0 - result.A.tile_fill_ratio) * 0.5 +
+        (1.0 - result.B.tile_fill_ratio) * 0.5 +
+        (1.0 - result.A.density) * 0.25 +
+        (1.0 - result.B.density) * 0.25;
+
+    const bool dense_candidate = result.A.is_dense_candidate && result.B.is_dense_candidate;
+    const bool obvious_dense = avg_density >= 0.35 && avg_tile_fill >= 0.35;
+    result.tile_modes = build_tile_mode_map(
+        cfg,
+        result.A,
+        result.B,
+        result.A_tiles,
+        result.B_tiles,
+        &result.policy_region_span_ti,
+        &result.policy_region_span_tj,
+        &result.policy_region_span_tk,
+        &result.sparse_region_count,
+        &result.dense_region_count,
+        &result.estimated_sparse_cost,
+        &result.estimated_dense_cost,
+        &result.estimated_mixed_cost);
+    for (enum workload_mode tile_mode : result.tile_modes) {
+        result.dense_tile_count += tile_mode == WORKLOAD_MODE_DENSE;
+        result.sparse_tile_count += tile_mode == WORKLOAD_MODE_SPARSE;
+    }
+
+    if (result.dense_tile_count == result.tile_modes.size()) {
+        result.selected_mode = WORKLOAD_MODE_DENSE;
+        result.decision_reason =
+            obvious_dense
+                ? "auto selected dense mode for clearly dense matrix pair"
+                : "auto selected dense mode from per-tile cost map";
+    } else if (result.sparse_tile_count == result.tile_modes.size()) {
+        result.selected_mode = WORKLOAD_MODE_SPARSE;
+        result.decision_reason =
+            (!dense_candidate || !(dense_score * 1.15 < sparse_score))
+                ? "auto kept sparse mode due to conservative sparse-score margin"
+                : "auto cost map still preferred sparse mode for every tile";
+    } else {
+        result.selected_mode = WORKLOAD_MODE_MIXED;
+        result.decision_reason = "auto selected a mixed sparse/dense tile map via offline DP";
+    }
+    return result;
+}
+
 i32 cmp_coord(const void *a, const void *b)
 {
     Coord x = *(const Coord *)a;
@@ -242,6 +876,7 @@ int main(int argc, char *argv[])
     bool condensedOP        = config["condensedOP"].get<bool>();
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
+    enum workload_mode requested_workload_mode = parse_workload_mode(config);
 
     cachesize = tmpsram * 262144 * 0.9;
     inputcachesize = cachesize;
@@ -316,6 +951,7 @@ int main(int argc, char *argv[])
         .dataflow   = Gust,
         .interorder = IJK,
         .format     = RR,
+        .workload_mode = requested_workload_mode,
 
         .I          = matA.nrows,
         .J          = matA.ncols,
@@ -391,6 +1027,7 @@ int main(int argc, char *argv[])
     Bc  = matB.Mc;
     offsetarrayB = matB.offsetarrayM;
     offsetarrayBc= matB.offsetarrayMc;
+    sim.workload = characterize_workload(requested_workload_mode, &matA, &matB, &sim.cfg);
 
 
     // {
@@ -501,6 +1138,43 @@ int main(int argc, char *argv[])
     printf("Matrix B: %llu x %llu, number of non-zeros = %llu\n", matB.nrows, matB.ncols, matB.nzM);
     printf("transpose: %d\n", matB.transpose);
     printf("I = %llu, K = %llu, J = %llu\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
+    printf("workload mode requested = %s, selected = %s\n",
+        print_workload_mode(sim.workload.requested_mode),
+        print_workload_mode(sim.workload.selected_mode));
+    printf("workload decision = %s\n", sim.workload.decision_reason.c_str());
+    printf("A density = %.6lf, mean_row_nnz = %.2lf, row_nnz_stddev = %.2lf, empty_row_ratio = %.6lf, tile_fill_ratio = %.6lf\n",
+        sim.workload.A.density,
+        sim.workload.A.mean_row_nnz,
+        sim.workload.A.row_nnz_stddev,
+        sim.workload.A.empty_row_ratio,
+        sim.workload.A.tile_fill_ratio);
+    printf("B density = %.6lf, mean_row_nnz = %.2lf, row_nnz_stddev = %.2lf, empty_row_ratio = %.6lf, tile_fill_ratio = %.6lf\n",
+        sim.workload.B.density,
+        sim.workload.B.mean_row_nnz,
+        sim.workload.B.row_nnz_stddev,
+        sim.workload.B.empty_row_ratio,
+        sim.workload.B.tile_fill_ratio);
+    printf("tile mode counts: sparse = %llu, dense = %llu\n",
+        sim.workload.sparse_tile_count,
+        sim.workload.dense_tile_count);
+    if (sim.workload.policy_region_span_ti || sim.workload.policy_region_span_tj || sim.workload.policy_region_span_tk) {
+        printf("policy region span (tiles): ti = %u, tj = %u, tk = %u; region counts: sparse = %u, dense = %u\n",
+            sim.workload.policy_region_span_ti,
+            sim.workload.policy_region_span_tj,
+            sim.workload.policy_region_span_tk,
+            sim.workload.sparse_region_count,
+            sim.workload.dense_region_count);
+    } else if (sim.workload.sparse_region_count || sim.workload.dense_region_count) {
+        printf("policy region grouping = adaptive similarity-based; region counts: sparse = %u, dense = %u\n",
+            sim.workload.sparse_region_count,
+            sim.workload.dense_region_count);
+    }
+    if (sim.workload.estimated_sparse_cost || sim.workload.estimated_dense_cost || sim.workload.estimated_mixed_cost) {
+        printf("estimated tile costs: sparse = %.2lf, dense = %.2lf, mixed = %.2lf\n",
+            sim.workload.estimated_sparse_cost,
+            sim.workload.estimated_dense_cost,
+            sim.workload.estimated_mixed_cost);
+    }
     /************************************************************/
 
     getParameter(); // sets estEffMAC
