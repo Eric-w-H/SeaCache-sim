@@ -254,13 +254,6 @@ void pre_load_B() {
                 int startk = sim.cursor.B.begins[tj - TJ], tmpk = sim.cursor.B.begins[tj - TJ],
                     maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
-                int halfk = sim.cursor.B.begins[tj - TJ];
-
-                while (halfk < maxk && B[tj][halfk] < (sim.cfg.kkk / 2) + TK) {
-                    halfk++;
-                }
-                tmpk = halfk;
-
                 while (tmpk < maxk && B[tj][tmpk] < sim.cfg.kkk + TK) {
                     tmpk++;
                 }
@@ -269,8 +262,8 @@ void pre_load_B() {
 
                 if (Bsizenow + tmpsize * 3 >= Bsize) {
                     if (!fulltagB) {
-                        fulltagB = 1;
-                        fullB = tj;
+                        fulltagB= 1;
+                        fullB   = tj;
                     }
                     //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {

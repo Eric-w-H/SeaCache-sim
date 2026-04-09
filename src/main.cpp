@@ -24,6 +24,7 @@ using json = nlohmann::json;
 
 struct matrix {
     b16 transpose;
+    b16 dense;
 
     Coord nrows;
     Coord ncols;
@@ -70,6 +71,30 @@ std::string get_matrix_path(const std::string& matrix_name) {
 
 void parse_matrix(FILE *f, struct matrix *x)
 {
+    if (x->dense) {
+        Coord longer_dim= max(x->ncols, x->nrows);
+        x->M_backing    = (Coord *)arena_push(global_persist, longer_dim*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
+        x->Mc_backing   = NULL;
+        x->M            = (Coord **)arena_push(global_persist, (x->nrows+1)*sizeof(*x->M), __alignof__(*x->M), 0);
+        x->Mc           = (Coord **)arena_push(global_persist, (x->ncols+1)*sizeof(*x->Mc), __alignof__(*x->Mc), 0);
+        x->offsetarrayM = (Coord *)arena_push(global_persist, (x->nrows+1)*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
+        x->offsetarrayMc= (Coord *)arena_push(global_persist, (x->ncols+1)*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
+
+        // trick: specify first row/col only (since they are all identical) and let all csr/csc entries alias to the same row/col
+        for (Coord i = 0; i < longer_dim; ++i)
+            x->M_backing[i] = i;
+
+        for (Coord i = 0; i < x->nrows+1; ++i) {
+            x->M[i]             = x->M_backing;
+            x->offsetarrayM[i]  = i*x->ncols;
+        }
+        for (Coord i = 0; i < x->ncols+1; ++i) {
+            x->Mc[i]            = x->M_backing;
+            x->offsetarrayMc[i] = i*x->nrows;
+        }
+
+        return;
+    }
     struct Arena_Mark mark = arena_snap(global_temp);
 
     b16 transpose = x->transpose;
@@ -81,7 +106,7 @@ void parse_matrix(FILE *f, struct matrix *x)
     Coord *raw_rows = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
     Coord *raw_cols = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
     Coord *row_lens = (Coord *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
-    Coord *col_lens = (Coord *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
+    Coord *col_lens = (Coord *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*col_lens), 1); // must be zeroed
     Coord *offsets;
 
     x->M_backing    = (Coord *)arena_push(global_persist, x->nzM*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
@@ -298,8 +323,8 @@ int main(int argc, char *argv[])
     assert(matrix2_file);
     assert(freopen(output_filepath.c_str(), "w", stdout));
 
-    struct matrix matA;
-    struct matrix matB;
+    struct matrix matA = {0};
+    struct matrix matB = {0};
     {
         #define TEMP_BUFFER_NBYTES 1024
         char buf[TEMP_BUFFER_NBYTES];
@@ -319,6 +344,8 @@ int main(int argc, char *argv[])
         sscanf(buf, "%u%u%u", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
+    matA.dense = (b16)((matA.nrows*matA.ncols) == matA.nzM);
+    matB.dense = (b16)((matB.nrows*matB.ncols) == matB.nzM);
     matA.transpose = (b16)transpose;
     matB.transpose = (b16)((matB.nrows == matB.ncols) ? transpose : !transpose);
     if (matA.transpose)
