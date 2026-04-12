@@ -294,6 +294,7 @@ int main(int argc, char *argv[])
     bool condensedOP        = config["condensedOP"].get<bool>();
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
+    std::string dense_matrices = config["denseMatrix"].get<std::string>(); // "A", "B", "both", "neither", default neither
 
     cachesize = tmpsram * 262144 * 0.9;
     inputcachesize = cachesize;
@@ -345,8 +346,12 @@ int main(int argc, char *argv[])
         sscanf(buf, "%u%u%u", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
-    matA.dense = (b16)((matA.nrows*matA.ncols) == matA.nzM);
-    matB.dense = (b16)((matB.nrows*matB.ncols) == matB.nzM);
+    matA.dense = dense_matrices == "A" || dense_matrices == "both";
+    matB.dense = dense_matrices == "B" || dense_matrices == "both";
+    if(matA.dense) matA.nzM = matA.nrows * matA.ncols;
+    if(matB.dense) matB.nzM = matB.nrows * matB.ncols;
+    // matA.dense = (b16)((matA.nrows*matA.ncols) == matA.nzM);
+    // matB.dense = (b16)((matB.nrows*matB.ncols) == matB.nzM);
     matA.transpose = (b16)transpose;
     matB.transpose = (b16)((matB.nrows == matB.ncols) ? transpose : !transpose);
     if (matA.transpose)

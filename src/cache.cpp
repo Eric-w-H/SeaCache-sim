@@ -471,7 +471,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         // use virtual tag
         if (invirtualtag) {
             // has invalid slot, fill, put the virtual tag slot to invalid
-            if (replacelfu == -1) {
+            if (replacelfu == -1 && !do_dense_install) {
                 // put current slot into cache
                 Valid[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
@@ -490,7 +490,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
 
             // has invalid slot in dense mapping, fill, put the virtual tag slot to invalid
             // Continue to use _set for the virtual tags
-            if (2 == useVirtualTag && -1 == densereplacelfu) {
+            if (-1 == densereplacelfu && do_dense_install) {
                 totalDenseInstalls++;
 
                 // put current slot into cache
@@ -506,7 +506,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // a slot in cache has lfu less then this in virtual. replace.
-            if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
+            if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] && !do_dense_install) {
                 // update metadata in cache (config to the current access)
                 Valid[_set * SETASSOC + replaceindex] = 1;
                 int oldtag = Tag[_set * SETASSOC + replaceindex];
@@ -528,7 +528,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // a slot in cache has lfu less then this in dense mapping. replace.
-            if (2 == useVirtualTag && densereplacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
+            if (densereplacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] && do_dense_install) {
                 totalDenseInstalls++;
 
                 // update metadata in cache (config to the current access)
@@ -548,7 +548,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         } else { // not in cache; not in virtual tag
 
             // has invalid slot, fill
-            if (replacelfu == -1) {
+            if (replacelfu == -1 && !do_dense_install) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
@@ -562,7 +562,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // has invalid dense slot, fill
-            if (2 == useVirtualTag && densereplacelfu == -1) {
+            if (densereplacelfu == -1 && do_dense_install) {
                 totalDenseInstalls++;
 
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
@@ -574,7 +574,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // has 0 slot, replace
-            if (replacelfu == 0) {
+            if (replacelfu == 0 && !do_dense_install) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
@@ -589,7 +589,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // has 0 slot in dense mapping, replace
-            if (2 == useVirtualTag && densereplacelfu == 0) {
+            if (densereplacelfu == 0 && do_dense_install) {
                 totalDenseInstalls++;
 
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
