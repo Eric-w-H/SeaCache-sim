@@ -925,6 +925,7 @@ bool prefetchrow(int ii) {
     // - how can they POSSIBLY guarantee that all the needed A columns are in cache? This is
     // essentially oracle access/cheating
     // - they are not charging for these accesses into metadata (e.g. increment computeSramAccess or something)
+    // Notes(ewh): I think this is "repairing" the cache state so the simulator doesn't have to properly track everything, so the cost in this loop ought to be already accounted for in real hardware over time. It's (of course) very optimistic in any multi-tenant hardware.
     while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
         // coordinate of required B fiber
         // in this prefetch: push the next access queue of jj a ii

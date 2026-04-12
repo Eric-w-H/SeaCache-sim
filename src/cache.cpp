@@ -39,7 +39,10 @@ int *LFUtag = nullptr;
 // short *partialValid = nullptr;
 
 // for the pack&split
-const int N_TAG_L_BITS = 0; // Tag-L bits
+// (ewh) this was 0, but the paper says it should be 4.
+const int N_TAG_L_BITS = 4;  // Tag-L bits
+const int N_EXTRA_BITS = 16; // Bits of address used in Extra field.
+const int EXTRA_RESERVED_ENCODING = (1 << N_EXTRA_BITS) - 1; // use the all-1's encoding as a sentinel to signal "dense mode"
 
 u8  *Cnt    = nullptr;
 u16 *PosOrig= nullptr;
@@ -115,7 +118,7 @@ long long getTagPS(long long fiberId) {
 }
 
 u16 getOrig(long long addr) {
-    return (addr >> CACHE_BLOCK_NELEMS_LOG2) & 0xFFFF;
+    return (addr >> CACHE_BLOCK_NELEMS_LOG2) & ((1 << N_EXTRA_BITS) - 1);
 }
 
 // = 0 when don't use virtual tag
@@ -195,9 +198,15 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
                         // not the same orig
                         continue;
                     }
+                    
+                    // ewh: dense data is here already
+                    if (PosOrig[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING && 2 == useVirtualTag) {
+                        continue;
+                    }
                 } else {
                     // first
                     if (PosOrig[_set * SETASSOC + i] != 0) {
+                        // A split/dense fiber is here already
                         continue;
                     }
                 }
@@ -211,6 +220,24 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
             }
         }
     }
+
+    // ewh: check the dense mapping, only applies when we have possible overflow
+    if(2 == useVirtualTag && !isfirst) {
+      // Check using "normal" cache indexing
+      _set = getSet(addr);
+      _tag = getTag(addr);
+
+        for(int i = 0; i < SETASSOC; ++i) {
+            if(Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag) && (Cnt[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING)) {
+                // cache hit, update LFU
+                if (lfubit[_set * SETASSOC + i]) {
+                    lfubit[_set * SETASSOC + i]--;
+                }
+                return 1;
+            }
+        }
+    }
+
     // miss !
     return 0;
 }
@@ -328,6 +355,12 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
     int _set = getSet2(addr);
     int _tag = getTag2(addr);
 
+    int densereplaceindex = -1;
+    int densereplacelfu = LFUmax + 1;
+    int _dense_set = getSet(addr);
+    int _dense_tag = getTag(addr);
+    bool do_dense_install = false;
+
     // calculate how many fibers can be loaded
     int fibercnt = 1;
     if (isfirst) {
@@ -383,6 +416,25 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         }
     }
 
+    // allow dense mapping. 
+    if (2 == useVirtualTag) {
+        // iterate separately to not stop the preferential search for the compressed format
+        for (int i = 0; i < SETASSOC; i++) {
+            if(!Valid[_dense_set * SETASSOC + i]) {
+                densereplaceindex = i;
+                densereplacelfu = -1;
+            } else {
+                int tmplfu = getlfubit(_dense_set, i);
+                if (tmplfu < replacelfu) {
+                    densereplacelfu = tmplfu;
+                    densereplaceindex = i;
+                }
+            }
+        }
+        // only do one kind of install, dense or sparse.
+        do_dense_install = (densereplacelfu < replacelfu) && (fibercnt == 1);
+    }
+
     if (!useVirtualTag) {
         // has invalid slot, fill
         if (replacelfu == -1) {
@@ -435,6 +487,21 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 return;
             }
 
+            // has invalid slot in dense mapping, fill, put the virtual tag slot to invalid
+	    // Continue to use _set for the virtual tags
+            if (2 == useVirtualTag && -1 == densereplacelfu) {
+                // put current slot into cache
+                Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
+                Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
+                Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;
+                PosOrig[_set * SETASSOC + densereplaceindex] = EXTRA_RESERVED_ENCODING;
+                initPracticalLFU(_dense_set, densereplaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
+
+                // put current virtual tag to invalid
+                virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 0;
+                return;
+            }
+
             // a slot in cache has lfu less then this in virtual. replace.
             if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
                 // update metadata in cache (config to the current access)
@@ -454,6 +521,24 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
                 virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
                 virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
+		return;
+            }
+
+            // a slot in cache has lfu less then this in dense mapping. replace.
+            if (2 == useVirtualTag && densereplacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
+                // update metadata in cache (config to the current access)
+                Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
+                int oldtag = Tag[_dense_set * SETASSOC + densereplaceindex];
+                Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
+                Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;
+                PosOrig[_set * SETASSOC + densereplaceindex] = EXTRA_RESERVED_ENCODING;
+                initPracticalLFU(_dense_set, densereplaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
+
+                // update metadata in virtual tag (config to the old slot in cache)
+                virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
+                virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
+                virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
+		return;
             }
         } else { // not in cache; not in virtual tag
 
@@ -471,6 +556,16 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 return;
             }
 
+            // has invalid dense slot, fill
+            if (2 == useVirtualTag && densereplacelfu == -1) {
+                Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
+                Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
+                Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;
+                PosOrig[_dense_set * SETASSOC + densereplaceindex] = EXTRA_RESERVED_ENCODING;
+                initPracticalLFU(_dense_set, densereplaceindex, 0);
+                return;
+            }
+
             // has 0 slot, replace
             if (replacelfu == 0) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
@@ -483,6 +578,17 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 }
 
                 initPracticalLFU(_set, replaceindex, 0);
+                return;
+            }
+
+            // has 0 slot in dense mapping, replace
+            if (2 == useVirtualTag && densereplacelfu == 0) {
+                Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
+                Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
+                Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;
+                PosOrig[_dense_set * SETASSOC + densereplaceindex] = EXTRA_RESERVED_ENCODING;
+
+                initPracticalLFU(_dense_set, densereplaceindex, 0);
                 return;
             }
 
@@ -953,7 +1059,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 u64 last_cache_nsets = 0;
 void initialize_cache()
 {
-    b32 need_realloc    = (CACHE_NSETS != last_cache_nsets);
+    b32 need_realloc    = (CACHE_NSETS > last_cache_nsets);
     last_cache_nsets    = CACHE_NSETS;
 
     u64 nblocks         = CACHE_NSETS*SETASSOC;

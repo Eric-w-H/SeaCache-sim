@@ -57,13 +57,13 @@ std::string get_matrix_path(const std::string& matrix_name) {
         {
           std::filesystem::path candidate{root + matrix_name + ".mtx"};
           if(std::filesystem::exists(candidate)) return candidate;
-	}
+        }
 
-	// test root/name/name.mtx
-	{
+        // test root/name/name.mtx
+        {
           std::filesystem::path candidate{root + matrix_name + '/' + matrix_name + ".mtx"};
           if(std::filesystem::exists(candidate)) return candidate;
-	}
+        }
     }
     std::cerr << "Error: " << matrix_name << " not found.\n";
     std::exit(1);
@@ -675,16 +675,17 @@ int main(int argc, char *argv[])
     if (!baselinetest) {
         puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
 
-        /*****************************************
+        CACHE_BLOCK_NELEMS      = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
+        ISCACHE = 1;
         adaptive_prefetch = 1;
+        // adaptive sparse-dense scheme, also uses virtual tag in sparse mode
         useVirtualTag = 2;
-        cacheScheme;
+        cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
-        runTile(kkk);
-        adaptive_prefetch = 0;
-        useVirtualTag = 0;
-        *****************************************/
+        reset_cursor(&sim.cursor);
+        runTile(sim.cfg.kkk);
     }
 
     bool ablationtest = 0;
