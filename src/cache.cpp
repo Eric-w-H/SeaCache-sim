@@ -200,7 +200,7 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
                     }
                     
                     // ewh: dense data is here already
-                    if (PosOrig[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING && 2 == useVirtualTag) {
+                    if ((PosOrig[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING) && (2 == useVirtualTag)) {
                         continue;
                     }
                 } else {
@@ -223,9 +223,9 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
 
     // ewh: check the dense mapping, only applies when we have possible overflow
     if(2 == useVirtualTag && !isfirst) {
-      // Check using "normal" cache indexing
-      _set = getSet(addr);
-      _tag = getTag(addr);
+        // Check using "normal" cache indexing
+        _set = getSet(addr);
+        _tag = getTag(addr);
 
         for(int i = 0; i < SETASSOC; ++i) {
             if(Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag) && (Cnt[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING)) {
@@ -233,6 +233,7 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
                 if (lfubit[_set * SETASSOC + i]) {
                     lfubit[_set * SETASSOC + i]--;
                 }
+                totalDenseHits++;
                 return 1;
             }
         }
@@ -488,8 +489,10 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             }
 
             // has invalid slot in dense mapping, fill, put the virtual tag slot to invalid
-	    // Continue to use _set for the virtual tags
+            // Continue to use _set for the virtual tags
             if (2 == useVirtualTag && -1 == densereplacelfu) {
+                totalDenseInstalls++;
+
                 // put current slot into cache
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
                 Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
@@ -521,11 +524,13 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
                 virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
                 virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
-		return;
+                return;
             }
 
             // a slot in cache has lfu less then this in dense mapping. replace.
             if (2 == useVirtualTag && densereplacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
+                totalDenseInstalls++;
+
                 // update metadata in cache (config to the current access)
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
                 int oldtag = Tag[_dense_set * SETASSOC + densereplaceindex];
@@ -538,7 +543,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                 virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
                 virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
                 virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
-		return;
+                return;
             }
         } else { // not in cache; not in virtual tag
 
@@ -558,6 +563,8 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
 
             // has invalid dense slot, fill
             if (2 == useVirtualTag && densereplacelfu == -1) {
+                totalDenseInstalls++;
+
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
                 Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
                 Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;
@@ -583,6 +590,8 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
 
             // has 0 slot in dense mapping, replace
             if (2 == useVirtualTag && densereplacelfu == 0) {
+                totalDenseInstalls++;
+
                 Valid[_dense_set * SETASSOC + densereplaceindex] = 1;
                 Tag[_dense_set * SETASSOC + densereplaceindex] = _dense_tag;
                 Cnt[_dense_set * SETASSOC + densereplaceindex] = 0;

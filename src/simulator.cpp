@@ -1493,6 +1493,8 @@ void reinitialize() {
     totalaccess = 0;
     data_access_total = 0;
 
+    totalDenseHits = totalDenseInstalls = 0;
+
     postDramAccess = postSramAccess = 0;
 
     if (ISCACHE) {

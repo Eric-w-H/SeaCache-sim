@@ -11,6 +11,7 @@ This branch fixes a "read one past end of array allocation" bug for offsetarrayA
 #include "headers.h"
 #include "json.hpp"
 #include "simulator.h"
+#include "statistics.h"
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
@@ -674,18 +675,32 @@ int main(int argc, char *argv[])
 
     if (!baselinetest) {
         puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
-
+        // cribbed settings from SCACHE
+        ISCACHE = 1;
+        cachesize               = 262144;
         CACHE_BLOCK_NELEMS      = 16;
         CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
-        ISCACHE = 1;
+        setSET();
+
+        cache.cfg = {
+            .block_nelems       = 1,
+            .block_nelems_log2  = 1,
+            .scheme             = CACHE_SCHEME_FLFU,
+        };
+
         adaptive_prefetch = 1;
-        // adaptive sparse-dense scheme, also uses virtual tag in sparse mode
-        useVirtualTag = 2;
         cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
+        // adaptive sparse-dense scheme, also uses virtual tag in sparse mode. Overloading this
+        // a little but it's ok.
+        useVirtualTag = 2;
+
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
+
+        printf("Dense installations: %lld\n", totalDenseInstalls);
+        printf("Dense hits: %lld\n", totalDenseHits);
     }
 
     bool ablationtest = 0;
