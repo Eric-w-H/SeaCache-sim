@@ -17,6 +17,7 @@ import json
 import re
 import subprocess
 import sys
+import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -281,6 +282,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--timeout", type=int, default=3600, help="Timeout per run in seconds")
     p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs + download missing data, skip simulator runs.")
     p.add_argument("--download-matrices", action="store_true", help="Download missing matrices into {--repo-root}/data")
+    p.add_argument("-j", "--jobs", type=int, default=1, help="Number of allowable parallel scache jobs.")
 
     # Used only when --profile full
     p.add_argument("--transpose-values", default="0")
@@ -359,28 +361,39 @@ def main(argv: Sequence[str]) -> int:
     total_jobs = len(valid_matrices) * len(configs)
     done_jobs = 0
 
-    for matrix in valid_matrices:
-        mtx_path = matrix_file_path(matrix, matrix_roots)
-        assert mtx_path is not None
+    with concurrent.futures.ThreadPoolExecutor(max_workers = max(1, args.jobs)) as executor:
+        # Use a dict to store the metadata along with the future
+        futures = {}
+        for matrix in valid_matrices:
+            mtx_path = matrix_file_path(matrix, matrix_roots)
+            assert mtx_path is not None
 
-        for cfg in configs:
-            done_jobs += 1
-            cfg_path = cfg_map[cfg]
-            print(
-                f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> running"
-                if not args.dry_run
-                else f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> dry run"
-            )
+            for cfg in configs:
+                done_jobs += 1
+                cfg_path = cfg_map[cfg]
+                print(
+                    f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> scheduled"
+                    if not args.dry_run
+                    else f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> dry run"
+                )
 
-            status, returncode, out_path, cmd = run_one(
-                scache_path=scache_path,
-                matrix=matrix,
-                cfg=cfg,
-                cfg_path=cfg_path,
-                output_dir=output_dir,
-                timeout_s=args.timeout,
-                dry_run=args.dry_run,
-            )
+                futures[executor.submit(run_one, 
+                        scache_path=scache_path,
+                        matrix=matrix,
+                        cfg=cfg,
+                        cfg_path=cfg_path,
+                        output_dir=output_dir,
+                        timeout_s=args.timeout,
+                        dry_run=args.dry_run,
+                )] = (done_jobs, matrix, mtx_path, cfg, cfg_path)
+
+        print()
+
+        for future in concurrent.futures.as_completed(futures):
+            # Recover the metadata and results
+            done_jobs, matrix, mtx_path, cfg, cfg_path = futures[future]
+            status, returncode, out_path, cmd = future.result()
+            print(f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> done")
 
             row: Dict[str, object] = {
                 "matrix": matrix,
