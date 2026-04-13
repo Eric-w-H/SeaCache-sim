@@ -317,7 +317,9 @@ int main(int argc, char *argv[])
         +   "GBs_" + std::to_string(tmpPE)
         +   "PEs_" + std::to_string(tmpbank) + "sbanks_"
         +   "_" + matrix1_name + "_" + matrix2_name + "_"
-        +   printFormat[format] + "_" + (transpose ? "1" : "0") + ".txt";
+        +   printFormat[format] + "_" + (transpose ? "1" : "0") 
+	+   "_dense_" + dense_matrices
+	+ ".txt";
 
     FILE *matrix1_file  = fopen(matrix1_filepath.c_str(), "r");
     FILE *matrix2_file  = fopen(matrix2_filepath.c_str(), "r");

@@ -123,7 +123,8 @@ u16 getOrig(long long addr) {
 
 // = 0 when don't use virtual tag
 // = 1 when use virtual tag
-bool useVirtualTag = 1;
+// = 2 when use dense mapping
+std::uint8_t useVirtualTag;
 
 int getLRU(int _set, int _index) { return lrubit[_set * SETASSOC + _index]; }
 int getlfubit(int _set, int _index) { return lfubit[_set * SETASSOC + _index]; }

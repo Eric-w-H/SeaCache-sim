@@ -71,7 +71,7 @@ class ExperimentConfig:
         condensed = 1 if self.condensedop else 0
         return (
             f"t{self.transpose}_c{self.cachesize:g}_bw{self.memorybandwidth:g}"
-            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}"
+            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}_dense_{"both" if self.denseA and self.denseB else ("A" if self.denseA and not self.denseB else ("B" if self.denseB and not self.denseA else "neither"))}"
         )
 
 
@@ -134,11 +134,14 @@ def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
             ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, False),
         ]
 
-    if args.profile == "quick-denseA":
+    if args.profile == "quick-dense":
         return [
             ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, True, False),
             ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, True, False),
             ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, True, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, True),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, True),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, True),
         ]
 
     if args.profile == "quick-baseline":
@@ -200,7 +203,7 @@ def expected_output_filename(matrix: str, cfg: ExperimentConfig) -> str:
     prefix = "Base_" if cfg.baselinetest else "SeaCache_"
     return (
         f"CGust{prefix}{cfg.cachesize:.6f}MB_{cfg.memorybandwidth:.6f}GBs_"
-        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}.txt"
+        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}_dense_{"both" if cfg.denseA and cfg.denseB else ("A" if cfg.denseA and not cfg.denseB else ("B" if cfg.denseB and not cfg.denseA else "neither"))}.txt"
     )
 
 
@@ -278,8 +281,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--results-csv", default="./output/collected_results.csv", help="CSV file for extracted metrics")
     p.add_argument("--matrices", default="", help="Comma-separated matrix names (default: discover from tiles)")
     p.add_argument("--max-matrices", type=int, default=0, help="Limit number of matrices (0 means no limit)")
-    p.add_argument("--profile", choices=["quick", "quick-denseA", "quick-baseline", "balanced", "full"], default="balanced")
-    p.add_argument("--timeout", type=int, default=3600, help="Timeout per run in seconds")
+    p.add_argument("--profile", choices=["quick", "quick-dense", "quick-baseline", "balanced", "full"], default="balanced")
+    p.add_argument("--timeout", type=int, default=int(60*60*5), help="Timeout per run in seconds")
     p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs + download missing data, skip simulator runs.")
     p.add_argument("--download-matrices", action="store_true", help="Download missing matrices into {--repo-root}/data")
     p.add_argument("-j", "--jobs", type=int, default=1, help="Number of allowable parallel scache jobs.")
@@ -410,6 +413,8 @@ def main(argv: Sequence[str]) -> int:
                 "srambank": cfg.srambank,
                 "baselinetest": cfg.baselinetest,
                 "condensedOP": int(cfg.condensedop),
+                "denseA": cfg.denseA,
+                "denseB": cfg.denseB,
             }
 
             if out_path and out_path.exists() and not args.dry_run:
