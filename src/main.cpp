@@ -11,6 +11,7 @@ This branch fixes a "read one past end of array allocation" bug for offsetarrayA
 #include "headers.h"
 #include "json.hpp"
 #include "simulator.h"
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 
@@ -307,7 +308,9 @@ static std::vector<enum workload_mode> build_tile_mode_map(
     Coord *dense_region_count_out,
     f64 *sparse_cost_out,
     f64 *dense_cost_out,
-    f64 *mixed_cost_out)
+    f64 *mixed_cost_out,
+    f64 *oracle_cost_out,
+    f64 *policy_overhead_out)
 {
     const Coord total_tiles = cfg->tti * cfg->ttj * cfg->ttk;
     std::vector<f64> sparse_cost(total_tiles, 0.0);
@@ -316,6 +319,7 @@ static std::vector<enum workload_mode> build_tile_mode_map(
 
     f64 force_sparse_cost = 0.0;
     f64 force_dense_cost = 0.0;
+    f64 oracle_tile_cost = 0.0;
     for (Coord ti = 0; ti < cfg->tti; ++ti) {
         const Coord row_count = min(cfg->iii, cfg->I - ti * cfg->iii);
         for (Coord tj = 0; tj < cfg->ttj; ++tj) {
@@ -334,6 +338,7 @@ static std::vector<enum workload_mode> build_tile_mode_map(
                     estimate_sparse_tile_cost(a_tile, b_tile, row_count, j_count, k_count, c_est, c_density);
                 dense_cost[tile_idx] =
                     estimate_dense_tile_cost(a_tile, b_tile, row_count, j_count, k_count, c_est, c_density);
+                oracle_tile_cost += min(sparse_cost[tile_idx], dense_cost[tile_idx]);
                 tile_features[tile_idx] = {
                     .sparse_cost = sparse_cost[tile_idx],
                     .dense_cost = dense_cost[tile_idx],
@@ -578,6 +583,8 @@ static std::vector<enum workload_mode> build_tile_mode_map(
     *sparse_cost_out = force_sparse_cost;
     *dense_cost_out = force_dense_cost;
     *mixed_cost_out = min(dp_sparse[total_regions - 1], dp_dense[total_regions - 1]);
+    *oracle_cost_out = oracle_tile_cost;
+    *policy_overhead_out = max(0.0, *mixed_cost_out - oracle_tile_cost);
     return tile_modes;
 }
 
@@ -587,6 +594,7 @@ static struct workload_characterization characterize_workload(
     const struct matrix *matB,
     const struct config *cfg)
 {
+    const auto t0 = std::chrono::steady_clock::now();
     struct workload_characterization result = {
         .requested_mode = requested_mode,
         .selected_mode = WORKLOAD_MODE_SPARSE,
@@ -631,7 +639,7 @@ static struct workload_characterization characterize_workload(
 
     const bool dense_candidate = result.A.is_dense_candidate && result.B.is_dense_candidate;
     const bool obvious_dense = avg_density >= 0.35 && avg_tile_fill >= 0.35;
-    result.tile_modes = build_tile_mode_map(
+        result.tile_modes = build_tile_mode_map(
         cfg,
         result.A,
         result.B,
@@ -644,7 +652,9 @@ static struct workload_characterization characterize_workload(
         &result.dense_region_count,
         &result.estimated_sparse_cost,
         &result.estimated_dense_cost,
-        &result.estimated_mixed_cost);
+        &result.estimated_mixed_cost,
+        &result.estimated_oracle_tile_cost,
+        &result.estimated_policy_overhead_cost);
     for (enum workload_mode tile_mode : result.tile_modes) {
         result.dense_tile_count += tile_mode == WORKLOAD_MODE_DENSE;
         result.sparse_tile_count += tile_mode == WORKLOAD_MODE_SPARSE;
@@ -666,6 +676,9 @@ static struct workload_characterization characterize_workload(
         result.selected_mode = WORKLOAD_MODE_MIXED;
         result.decision_reason = "auto selected a mixed sparse/dense tile map via offline DP";
     }
+    const auto t1 = std::chrono::steady_clock::now();
+    result.policy_build_time_us =
+        std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
     return result;
 }
 
@@ -1174,6 +1187,10 @@ int main(int argc, char *argv[])
             sim.workload.estimated_sparse_cost,
             sim.workload.estimated_dense_cost,
             sim.workload.estimated_mixed_cost);
+        printf("estimated oracle tile cost = %.2lf, estimated policy overhead = %.2lf, policy build time = %.2lf us\n",
+            sim.workload.estimated_oracle_tile_cost,
+            sim.workload.estimated_policy_overhead_cost,
+            sim.workload.policy_build_time_us);
     }
     /************************************************************/
 

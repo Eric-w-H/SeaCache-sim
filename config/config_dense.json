@@ -1,0 +1,12 @@
+{
+    "transpose": 0,
+    "cachesize": 2,
+    "memorybandwidth": 68,
+    "PEcnt": 32,
+    "srambank": 32,
+    "baselinetest": 1,
+    "condensedOP": false,
+    "tileDir": "./tiles/",
+    "outputDir": "./output/",
+    "workloadMode": "dense"
+}

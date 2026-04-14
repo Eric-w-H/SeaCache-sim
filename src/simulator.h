@@ -41,6 +41,9 @@ struct workload_characterization {
     f64 estimated_sparse_cost;
     f64 estimated_dense_cost;
     f64 estimated_mixed_cost;
+    f64 estimated_oracle_tile_cost;
+    f64 estimated_policy_overhead_cost;
+    f64 policy_build_time_us;
     std::string decision_reason;
 };
 
