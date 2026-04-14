@@ -27,11 +27,11 @@ enum cache_scheme {
 };
 
 
-struct cache_config {
-    u64 block_nelems;
-    u64 block_nelems_log2;
-    enum cache_scheme scheme;
-};
+// struct cache_config {
+//     u64 block_nelems;
+//     u64 block_nelems_log2;
+//     enum cache_scheme scheme;
+// };
 
 struct cache_stats {
 };
@@ -39,7 +39,7 @@ struct cache_stats {
 
 struct cache {
     struct Arena        *backing;
-    struct cache_config cfg;
+    // struct cache_config cfg;
     struct cache_stats  stats;
 
 };
@@ -50,8 +50,8 @@ extern u64 cachesize;
 
 extern enum cache_scheme cacheScheme;
 
-extern u64 CACHE_BLOCK_NELEMS;
-extern u64 CACHE_BLOCK_NELEMS_LOG2;
+extern u64 CACHE_BLOCK_NWORDS;
+extern u64 CACHE_BLOCK_NWORDS_LOG2;
 
 extern std::uint8_t useVirtualTag;
 extern u64 inputcachesize;

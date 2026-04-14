@@ -944,8 +944,8 @@ bool prefetchrow(int ii) {
 
             long long firstaddr = getCacheAddr(jj, 0);
             int fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
-            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NELEMS) {
-                long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NELEMS);
+            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NWORDS) {
+                long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NWORDS);
 
                 int _set = getSet2(tmpaddr);
                 int _tag = getTag2(tmpaddr);
@@ -1702,7 +1702,7 @@ void runTile(int kkk)
     if ((cacheScheme == 4) || (cacheScheme == 5) || (cacheScheme == 7)) {
         // need to add back after this calculation
         cachesize = inputcachesize;
-        CACHE_NSETS = cachesize / (CACHE_BLOCK_NELEMS * SETASSOC);
+        CACHE_NSETS = cachesize / (CACHE_BLOCK_NWORDS * SETASSOC);
         CACHE_NSETS_LOG2 = getlog(CACHE_NSETS);
     }
 

@@ -589,15 +589,15 @@ int main(int argc, char *argv[])
 
         ISCACHE = 1;
         cachesize               = 262144;
-        CACHE_BLOCK_NELEMS      = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
+        CACHE_BLOCK_NWORDS      = 16;
+        CACHE_BLOCK_NWORDS_LOG2 = getlog(CACHE_BLOCK_NWORDS);
         setSET();
 
-        cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
-            .scheme             = CACHE_SCHEME_FLFU,
-        };
+        // cache.cfg = {
+        //     .block_nelems       = 1,
+        //     .block_nelems_log2  = 1,
+        //     .scheme             = CACHE_SCHEME_FLFU,
+        // };
 
         adaptive_prefetch = 1;
         useVirtualTag = 1;
@@ -619,8 +619,8 @@ int main(int argc, char *argv[])
         prefetchSize = inputcachesize / 6;
         cacheScheme = CACHE_SCHEME_INNER_SP;
         cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
+        CACHE_BLOCK_NWORDS = 16;
+        CACHE_BLOCK_NWORDS_LOG2 = 4;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
@@ -633,8 +633,8 @@ int main(int argc, char *argv[])
         cacheScheme = CACHE_SCHEME_SPARCH;
         prefetchSize = inputcachesize / 6;
         cachesize = inputcachesize - prefetchSize;
-        CACHE_BLOCK_NELEMS = 144;
-        CACHE_BLOCK_NELEMS_LOG2 = 8;
+        CACHE_BLOCK_NWORDS = 144;
+        CACHE_BLOCK_NWORDS_LOG2 = 8;
         setSET();
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
@@ -653,8 +653,8 @@ int main(int argc, char *argv[])
         reset_cursor(&sim.cursor);
         runTile(newkkk);
         // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
+        CACHE_BLOCK_NWORDS = 16;
+        CACHE_BLOCK_NWORDS_LOG2 = 4;
         cachesize = inputcachesize;
         setSET();
 
@@ -666,15 +666,15 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 4;
-        CACHE_BLOCK_NELEMS_LOG2 = 2;
+        CACHE_BLOCK_NWORDS = 4;
+        CACHE_BLOCK_NWORDS_LOG2 = 2;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
         // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
+        CACHE_BLOCK_NWORDS = 16;
+        CACHE_BLOCK_NWORDS_LOG2 = 4;
         setSET();
 
         puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");
@@ -693,15 +693,15 @@ int main(int argc, char *argv[])
         // cribbed settings from SCACHE
         ISCACHE = 1;
         cachesize               = 262144;
-        CACHE_BLOCK_NELEMS      = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
+        CACHE_BLOCK_NWORDS      = 16;
+        CACHE_BLOCK_NWORDS_LOG2 = getlog(CACHE_BLOCK_NWORDS);
         setSET();
 
-        cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
-            .scheme             = CACHE_SCHEME_FLFU,
-        };
+        // cache.cfg = {
+        //     .block_nelems       = 1,
+        //     .block_nelems_log2  = 1,
+        //     .scheme             = CACHE_SCHEME_FLFU,
+        // };
 
         adaptive_prefetch = 1;
         cacheScheme = CACHE_SCHEME_FLFU;
