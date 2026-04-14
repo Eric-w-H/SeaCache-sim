@@ -593,8 +593,6 @@ int main(int argc, char *argv[])
         cachesize               = 262144;
 
         cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
             .scheme             = CACHE_SCHEME_FLFU,
 	    .CACHE_BLOCK_BYTES  = 64,
 	    .CACHE_BLOCK_DWORDS = 64 / 4,
@@ -689,8 +687,6 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cachesize               = 262144;
         cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
             .scheme             = CACHE_SCHEME_FLFU,
 	    .CACHE_BLOCK_BYTES  = 64,
 	    .CACHE_BLOCK_DWORDS = 64 / 4,

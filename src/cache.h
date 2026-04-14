@@ -29,8 +29,6 @@ enum cache_scheme {
 
 
 struct cache_config {
-    u64 block_nelems;
-    u64 block_nelems_log2;
     enum cache_scheme scheme;
 
     u64 CACHE_BLOCK_BYTES;
@@ -40,15 +38,9 @@ struct cache_config {
     u64 CACHE_BLOCK_BYTES_PER_COORD;
 };
 
-struct cache_stats {
-};
-
-
 struct cache {
     struct Arena        *backing;
     struct cache_config cfg;
-    struct cache_stats  stats;
-
 };
 
 extern struct cache cache;
