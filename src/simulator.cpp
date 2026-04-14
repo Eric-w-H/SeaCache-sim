@@ -1068,6 +1068,73 @@ bool prefetchrow(int ii) {
     return 1;
 }
 
+static inline Coord dense_tile_words(Coord nbits)
+{
+    return div_rup(nbits, (Coord)64);
+}
+
+static inline Coord current_tile_linear_idx()
+{
+    return (sim.cursor.ti * sim.cfg.ttj + sim.cursor.tj) * sim.cfg.ttk + sim.cursor.tk;
+}
+
+static inline enum workload_mode current_tile_mode()
+{
+    if (!sim.workload.tile_modes.empty()) {
+        const Coord tile_idx = current_tile_linear_idx();
+        if (tile_idx < sim.workload.tile_modes.size())
+            return sim.workload.tile_modes[tile_idx];
+    }
+    return sim.workload.selected_mode;
+}
+
+static inline void dense_set_bit(std::vector<u64> &bits, Coord major_idx, Coord minor_idx, Coord words_per_major)
+{
+    bits[major_idx * words_per_major + (minor_idx >> 6)] |= (1ULL << (minor_idx & 63));
+}
+
+static inline b16 dense_mode_enabled()
+{
+    return current_tile_mode() == WORKLOAD_MODE_DENSE && sim.cfg.dataflow == Gust;
+}
+
+static std::vector<u64> dense_a_row_bits_workspace;
+static std::vector<u64> dense_b_col_bits_workspace;
+static std::vector<Coord> dense_a_tile_nnz_workspace;
+
+static void dense_account_a_row_access(int ii_abs, Coord a_tile_nnz)
+{
+    if (consistent_A()) {
+        i64 cost = a_tile_nnz * 3;
+        b32 hitA = (interorder == IJK || interorder == JIK) && (fulltagA == 0 || ii_abs < fullA);
+
+        if (hitA) {
+            computeSramAccess += sramReadBandwidth(cost);
+            if (cacheScheme == CACHE_SCHEME_INNER_SP)
+                computeSramAccess += sramReadBandwidth(cost);
+        } else {
+            computeDramAccess   += memoryBandwidthPE(cost);
+            computeA            += memoryBandwidthPE(cost);
+            AccessByte          += cost;
+            computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
+
+            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+                computeDramAccess   += memoryBandwidthPE(cost);
+                computeA            += memoryBandwidthPE(cost);
+                computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
+            }
+        }
+    } else {
+        computeSramAccess   += sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[ii_abs] + 3) / 4);
+
+        if (fulltagA) {
+            computeDramAccess   += (memoryBandwidthPE(3)) * ((long long)TJ + sim.cfg.jjj - fullA);
+            computeA            += (memoryBandwidthPE(3)) * (long long)((long long)TJ + sim.cfg.jjj - fullA);
+            AccessByte          += 3 * ((long long)TJ + sim.cfg.jjj - fullA);
+        }
+    }
+}
+
 int get_num_samples(f64 current_temperature) {
 
     if (current_temperature > SA_INITIAL_TEMP * 0.5) {
@@ -1245,7 +1312,84 @@ Only in two place :
 1) The iterate mode (compact or chained) (but the format is same)
 2) The unbuffered (missed) access
 */
-void calculate() {
+static void calculate_dense()
+{
+    computePE = computeDramAccess = computeSramAccess = 0;
+
+    const Coord row_count = min(sim.cfg.iii, sim.cfg.I - TI);
+    const Coord j_count   = min(sim.cfg.jjj, sim.cfg.J - TJ);
+    const Coord k_count   = min(sim.cfg.kkk, sim.cfg.K - TK);
+    const Coord words_j   = dense_tile_words(j_count);
+    dense_a_row_bits_workspace.assign(row_count * words_j, 0);
+    dense_b_col_bits_workspace.assign(k_count * words_j, 0);
+    dense_a_tile_nnz_workspace.assign(row_count, 0);
+    std::vector<u64> &a_row_bits = dense_a_row_bits_workspace;
+    std::vector<u64> &b_col_bits = dense_b_col_bits_workspace;
+    std::vector<Coord> &a_tile_nnz = dense_a_tile_nnz_workspace;
+
+    for (Coord ii_local = 0; ii_local < row_count; ++ii_local) {
+        const Coord ii_abs = TI + ii_local;
+        Coord tmpj = sim.cursor.A.begins[ii_local];
+        const Coord maxj = offsetarrayA[ii_abs + 1] - offsetarrayA[ii_abs];
+
+        while (tmpj < maxj && A[ii_abs][tmpj] < TJ + j_count) {
+            dense_set_bit(a_row_bits, ii_local, A[ii_abs][tmpj] - TJ, words_j);
+            ++a_tile_nnz[ii_local];
+            ++tmpj;
+        }
+
+        dense_account_a_row_access(ii_abs, a_tile_nnz[ii_local]);
+    }
+
+    for (Coord jj_local = 0; jj_local < j_count; ++jj_local) {
+        const Coord bsize = sim.cursor.B.sizes[jj_local];
+        if (bsize == 0)
+            continue;
+
+        const Coord jj_abs = TJ + jj_local;
+        get_B_fiber(jj_abs, jj_local);
+        for (Coord k_idx = 0; k_idx < bsize; ++k_idx) {
+            const Coord bpos = sim.cursor.B.begins[jj_local] + k_idx;
+            const Coord kk_abs = B[jj_abs][bpos];
+            if (kk_abs >= TK + k_count)
+                break;
+            dense_set_bit(b_col_bits, kk_abs - TK, jj_local, words_j);
+        }
+    }
+
+    for (Coord ii_local = 0; ii_local < row_count; ++ii_local) {
+        const Coord ii_abs = TI + ii_local;
+        for (Coord kk_local = 0; kk_local < k_count; ++kk_local)
+            tmpC[TK + kk_local] = 0;
+
+        for (Coord kk_local = 0; kk_local < k_count; ++kk_local) {
+            Coord cell_mac = 0;
+            for (Coord word = 0; word < words_j; ++word) {
+                const u64 overlap =
+                    a_row_bits[ii_local * words_j + word] &
+                    b_col_bits[kk_local * words_j + word];
+                cell_mac += __builtin_popcountll(overlap);
+            }
+            computePE += cell_mac;
+            elements_processed_since_last_adjustment += cell_mac;
+            if (cell_mac)
+                tmpC[TK + kk_local] = 1;
+        }
+
+        updateCAccess(ii_abs);
+    }
+
+    totalCycle += max(computePE / PEcnt, max(computeDramAccess / PEcnt,
+                                             computeSramAccess / sramBank));
+    calCycle += max(computePE / PEcnt,
+                    max(computeDramAccess / PEcnt, computeSramAccess / sramBank));
+
+    totalSram += computeSramAccess / sramBank;
+    totalDram += computeDramAccess / PEcnt;
+    totalPE += computePE / PEcnt;
+}
+
+static void calculate_sparse() {
 
     computePE = computeDramAccess = computeSramAccess = 0;
 
@@ -1443,6 +1587,14 @@ void calculate() {
     totalSram += computeSramAccess / sramBank;
     totalDram += computeDramAccess / PEcnt;
     totalPE += computePE / PEcnt;
+}
+
+void calculate() {
+    if (dense_mode_enabled()) {
+        calculate_dense();
+        return;
+    }
+    calculate_sparse();
 }
 
 void configPartial(f32 partialA, f32 partialB, f32 partialC) {

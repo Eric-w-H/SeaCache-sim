@@ -1,10 +1,57 @@
 #ifndef SIMULATOR_H
 #define SIMULATOR_H
 
+enum workload_mode {
+    WORKLOAD_MODE_AUTO,
+    WORKLOAD_MODE_SPARSE,
+    WORKLOAD_MODE_DENSE,
+    WORKLOAD_MODE_MIXED,
+};
+
+struct matrix_characterization {
+    f64 density;
+    f64 mean_row_nnz;
+    f64 row_nnz_stddev;
+    f64 empty_row_ratio;
+    f64 tile_fill_ratio;
+    b16 is_dense_candidate;
+};
+
+struct tile_characterization {
+    Coord nnz;
+    Coord active_major_count;
+    f64 fill_ratio;
+};
+
+struct workload_characterization {
+    enum workload_mode requested_mode;
+    enum workload_mode selected_mode;
+    struct matrix_characterization A;
+    struct matrix_characterization B;
+    std::vector<struct tile_characterization> A_tiles;
+    std::vector<struct tile_characterization> B_tiles;
+    std::vector<enum workload_mode> tile_modes;
+    Coord dense_tile_count;
+    Coord sparse_tile_count;
+    Coord dense_region_count;
+    Coord sparse_region_count;
+    Coord policy_region_span_ti;
+    Coord policy_region_span_tj;
+    Coord policy_region_span_tk;
+    f64 estimated_sparse_cost;
+    f64 estimated_dense_cost;
+    f64 estimated_mixed_cost;
+    f64 estimated_oracle_tile_cost;
+    f64 estimated_policy_overhead_cost;
+    f64 policy_build_time_us;
+    std::string decision_reason;
+};
+
 struct config {
     enum DataFlow   dataflow;
     enum InterOrder interorder;
     enum Format     format;
+    enum workload_mode workload_mode;
 
     Coord   I, // num rows in A
             J, // num cols in A, equiv. num rows in B
@@ -56,6 +103,7 @@ struct cursor {
 struct simulator_state {
     struct config cfg;
     struct cursor cursor;
+    struct workload_characterization workload;
 };
 
 
