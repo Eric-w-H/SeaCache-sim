@@ -951,6 +951,8 @@ int main(int argc, char *argv[])
     std::string output_dir  = config["outputDir"].get<std::string>();
     enum workload_mode requested_workload_mode = parse_workload_mode(config);
     std::string dense_matrices = config["denseMatrix"].get<std::string>(); // "A", "B", "both", "neither", default neither
+    unsigned elemsize       = config["elemBytes"].get<int>();
+    unsigned coordsize      = config["coordBytes"].get<int>();
 
     cachesize = tmpsram * 262144 * 0.9;
     inputcachesize = cachesize;
@@ -1280,15 +1282,16 @@ int main(int argc, char *argv[])
 
         ISCACHE = 1;
         cachesize               = 262144;
-        CACHE_BLOCK_NELEMS      = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
-        setSET();
 
         cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
             .scheme             = CACHE_SCHEME_FLFU,
+	    .CACHE_BLOCK_BYTES  = 64,
+	    .CACHE_BLOCK_DWORDS = 64 / 4,
+	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
+	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
+	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
         };
+        setSET();
 
         adaptive_prefetch = 1;
         useVirtualTag = 1;
@@ -1310,8 +1313,8 @@ int main(int argc, char *argv[])
         prefetchSize = inputcachesize / 6;
         cacheScheme = CACHE_SCHEME_INNER_SP;
         cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
+        cache.cfg.CACHE_BLOCK_DWORDS = 16;
+        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 4;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
@@ -1324,8 +1327,8 @@ int main(int argc, char *argv[])
         cacheScheme = CACHE_SCHEME_SPARCH;
         prefetchSize = inputcachesize / 6;
         cachesize = inputcachesize - prefetchSize;
-        CACHE_BLOCK_NELEMS = 144;
-        CACHE_BLOCK_NELEMS_LOG2 = 8;
+        cache.cfg.CACHE_BLOCK_DWORDS = 144;
+        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 8;
         setSET();
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
@@ -1343,11 +1346,6 @@ int main(int argc, char *argv[])
         }
         reset_cursor(&sim.cursor);
         runTile(newkkk);
-        // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
-        cachesize = inputcachesize;
-        setSET();
 
         ////////////  X-cache
         puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test X-cache   "
@@ -1357,16 +1355,11 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 4;
-        CACHE_BLOCK_NELEMS_LOG2 = 2;
+        cache.cfg.CACHE_BLOCK_DWORDS = 4;
+        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 2;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
-
-        // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
-        setSET();
 
         puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");
         ISCACHE = 0;
@@ -1384,15 +1377,15 @@ int main(int argc, char *argv[])
         // cribbed settings from SCACHE
         ISCACHE = 1;
         cachesize               = 262144;
-        CACHE_BLOCK_NELEMS      = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
-        setSET();
-
         cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
             .scheme             = CACHE_SCHEME_FLFU,
+	    .CACHE_BLOCK_BYTES  = 64,
+	    .CACHE_BLOCK_DWORDS = 64 / 4,
+	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
+	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
+	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
         };
+        setSET();
 
         adaptive_prefetch = 1;
         cacheScheme = CACHE_SCHEME_FLFU;
