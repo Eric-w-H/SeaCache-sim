@@ -261,6 +261,10 @@ void reset_cursor(struct cursor *c)
     c->tk   = 0;
 }
 
+void release_global_persist() { arena_release(global_persist); }
+void release_global_temp()    { arena_release(global_temp);    }
+void release_cache_backing()  { arena_release(cache.backing);  }
+
 int main(int argc, char *argv[])
 {
     if (argc != 4) {
@@ -273,6 +277,10 @@ int main(int argc, char *argv[])
     global_persist  = arena_alloc(16*GB, MB);
     global_temp     = arena_alloc(16*GB, MB);
     cache.backing   = arena_alloc(16*GB, MB);
+
+    if(std::atexit(release_global_persist)) { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
+    if(std::atexit(release_global_temp))    { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
+    if(std::atexit(release_cache_backing))  { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
 
     std::string matrix1_name    = argv[1];
     std::string matrix2_name    = argv[2];

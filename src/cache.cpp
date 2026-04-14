@@ -133,6 +133,20 @@ void initPracticalLFU(int _set, int _index, int LFUtime) {
     lfubit[_set * SETASSOC + _index] = LFUtime;
 }
 
+
+void updateLFUHit(int _set, int i) {
+    if (++lfubit[_set * SETASSOC + i] >= LFUmax) {
+        // halve the LFU if necessary
+        for(int j = 0; j < SETASSOC; j++) lfubit[_set * SETASSOC + j] /= 2;
+    }
+}
+void updateVirtualLFUHit(int _set, int i) {
+    if (++virtuallfubit[_set * VIRTUALSETASSOC + i] >= LFUmax) {
+        // halve the LFU if necessary
+        for(int j = 0; j < VIRTUALSETASSOC; j++) virtuallfubit[_set * SETASSOC + j] /= 2;
+    }
+}
+
 bool cacheHit(long long addr) {
     int _set = getSet(addr);
     int _tag = getTag(addr);
@@ -213,9 +227,7 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
                 }
                 // hit !!
                 // updatePracticalLFU; update without lfutime
-                if (lfubit[_set * SETASSOC + i]) {
-                    lfubit[_set * SETASSOC + i]--;
-                }
+                updateLFUHit(_set, i);
 
                 return 1;
             }
@@ -231,9 +243,7 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
         for(int i = 0; i < SETASSOC; ++i) {
             if(Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag) && (Cnt[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING)) {
                 // cache hit, update LFU
-                if (lfubit[_set * SETASSOC + i]) {
-                    lfubit[_set * SETASSOC + i]--;
-                }
+                updateLFUHit(_set, i);
                 totalDenseHits++;
                 return 1;
             }
@@ -396,7 +406,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
                     // invalid, then put it into virtual tag.
                     invirtualtag = 1;
                     virtualindex = i;
-                    virtuallfubit[_set * VIRTUALSETASSOC + i]--;
+                    updateVirtualLFUHit(_set, i);
                 }
             }
         }
