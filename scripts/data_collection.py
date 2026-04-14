@@ -52,6 +52,8 @@ class ExperimentConfig:
     condensedop: bool
     denseA: bool
     denseB: bool
+    elemBytes: int
+    coordBytes: int
 
     def json_obj(self, tile_dir: str, output_dir: str) -> Dict[str, object]:
         return {
@@ -65,6 +67,8 @@ class ExperimentConfig:
             "tileDir": tile_dir,
             "outputDir": output_dir,
             "denseMatrix": "both" if self.denseA and self.denseB else ("A" if self.denseA and not self.denseB else ("B" if self.denseB and not self.denseA else "neither")),
+            "elemBytes": self.elemBytes,
+            "coordBytes": self.coordBytes,
         }
 
     def tag(self) -> str:
@@ -129,55 +133,61 @@ def validate_inputs(
 def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
     if args.profile == "quick":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, False, 8, 4),
         ]
 
     if args.profile == "quick-dense":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, True, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, True, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, True, False),
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, True),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, True),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, True),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, True, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, True, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, True, False, 8, 4),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, True, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, True, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, True, 8, 4),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, True, True, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, True, True, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, True, True, 8, 4),
         ]
 
     if args.profile == "quick-baseline-dense":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, True, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, True, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, True, False),
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, True),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, True),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, True),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, True, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, True, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, True, False, 8, 4),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, True, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, True, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, True, 8, 4),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, True, True, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, True, True, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, True, True, 8, 4),
         ]
 
     if args.profile == "quick-baseline":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, False, 8, 4),
         ]
 
     if args.profile == "balanced":
         return [
-            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False, False, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False, False, False),
+            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False, False, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False, False, False, 8, 4),
         ]
 
     if args.profile == "full":
         configs = [
-            ExperimentConfig(t, c, bw, pe, sb, b, co)
-            for t, c, bw, pe, sb, b, co in itertools.product(
+            ExperimentConfig(t, c, bw, pe, sb, b, co, dA, dB, es, cs)
+            for t, c, bw, pe, sb, b, co, dA, dB, es, cs in itertools.product(
                 parse_csv_numbers(args.transpose_values, int),
                 parse_csv_numbers(args.cachesize_values, float),
                 parse_csv_numbers(args.bandwidth_values, float),
@@ -185,6 +195,9 @@ def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
                 parse_csv_numbers(args.srambank_values, int),
                 parse_csv_numbers(args.baseline_values, int),
                 [False if x == 0 else True for x in parse_csv_numbers(args.condensed_values, int)],
+                [False, True],
+                [False, True],
+                [8, 4, 2, 1]
             )
         ]
         return configs
