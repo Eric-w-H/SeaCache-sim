@@ -15,6 +15,8 @@ long long postDramAccess, postSramAccess;
 long long computeA, computeB, computeC;
 long long totalSram, totalDram, totalPE;
 
+long long totalDenseInstalls, totalDenseHits;
+
 // totalA/B/C correspond to all dram access (in the whole process)
 long long totalA, totalB, totalC;
 // preA, preB, postC correspond the the pre & post access

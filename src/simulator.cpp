@@ -254,13 +254,6 @@ void pre_load_B() {
                 int startk = sim.cursor.B.begins[tj - TJ], tmpk = sim.cursor.B.begins[tj - TJ],
                     maxk = offsetarrayB[tj + 1] - offsetarrayB[tj];
 
-                int halfk = sim.cursor.B.begins[tj - TJ];
-
-                while (halfk < maxk && B[tj][halfk] < (sim.cfg.kkk / 2) + TK) {
-                    halfk++;
-                }
-                tmpk = halfk;
-
                 while (tmpk < maxk && B[tj][tmpk] < sim.cfg.kkk + TK) {
                     tmpk++;
                 }
@@ -269,8 +262,8 @@ void pre_load_B() {
 
                 if (Bsizenow + tmpsize * 3 >= Bsize) {
                     if (!fulltagB) {
-                        fulltagB = 1;
-                        fullB = tj;
+                        fulltagB= 1;
+                        fullB   = tj;
                     }
                     //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {
@@ -932,6 +925,7 @@ bool prefetchrow(int ii) {
     // - how can they POSSIBLY guarantee that all the needed A columns are in cache? This is
     // essentially oracle access/cheating
     // - they are not charging for these accesses into metadata (e.g. increment computeSramAccess or something)
+    // Notes(ewh): I think this is "repairing" the cache state so the simulator doesn't have to properly track everything, so the cost in this loop ought to be already accounted for in real hardware over time. It's (of course) very optimistic in any multi-tenant hardware.
     while (tmpj < maxj && A[ii][tmpj] < TJ + sim.cfg.jjj) {
         // coordinate of required B fiber
         // in this prefetch: push the next access queue of jj a ii
@@ -1650,6 +1644,8 @@ void reinitialize() {
     data_access_hit = 0;
     totalaccess = 0;
     data_access_total = 0;
+
+    totalDenseHits = totalDenseInstalls = 0;
 
     postDramAccess = postSramAccess = 0;
 

@@ -14,18 +14,18 @@ extern int sramBank;
 
 // DRAM ↔ SRAM bandwidth calculations
 __attribute__((always_inline)) static
-f64 memoryBandwidthWhole(u64 ss){return div_rup(ss, HBMbandwidth);}
+inline f64 memoryBandwidthWhole(u64 ss){return div_rup(ss, HBMbandwidth);}
 
 // bandwidth per PE
 __attribute__((always_inline)) static
-f64 memoryBandwidthPE(u64 ss)   {return ss / HBMbandwidthperPE; }
+inline f64 memoryBandwidthPE(u64 ss)   {return ss / HBMbandwidthperPE; }
 
 // SRAM cycle
 __attribute__((always_inline)) static
-u64 sramReadBandwidth(u64 ss)   {return ss / 2; }
+inline u64 sramReadBandwidth(u64 ss)   {return ss / 2; }
 
 __attribute__((always_inline)) static
-u64 sramWriteBandwidth(u64 ss)  {return ss; }
+inline u64 sramWriteBandwidth(u64 ss)  {return ss; }
 
 extern bool ISCACHE;
 

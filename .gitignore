@@ -10,3 +10,5 @@ hyte
 scache
 .vscode/**
 scripts/__pycache__/**
+scripts/.ipynb_checkpoints/**
+generated_configs/**

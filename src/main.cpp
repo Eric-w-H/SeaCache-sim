@@ -12,8 +12,10 @@ This branch fixes a "read one past end of array allocation" bug for offsetarrayA
 #include "json.hpp"
 #include "simulator.h"
 #include <chrono>
+#include "statistics.h"
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 
 struct Arena *global_persist;
 struct Arena *global_temp;
@@ -24,6 +26,7 @@ using json = nlohmann::json;
 
 struct matrix {
     b16 transpose;
+    b16 dense;
 
     Coord nrows;
     Coord ncols;
@@ -689,8 +692,57 @@ i32 cmp_coord(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
+std::string get_matrix_path(const std::string& matrix_name) {
+    std::string relative_roots[] = {
+        "./data/",
+        "./largedata/",
+        "./dense/",
+        "./bfs/"
+    };
+
+    for (auto& root : relative_roots) {
+        // test root/name.mtx
+        {
+          std::filesystem::path candidate{root + matrix_name + ".mtx"};
+          if(std::filesystem::exists(candidate)) return candidate;
+        }
+
+        // test root/name/name.mtx
+        {
+          std::filesystem::path candidate{root + matrix_name + '/' + matrix_name + ".mtx"};
+          if(std::filesystem::exists(candidate)) return candidate;
+        }
+    }
+    std::cerr << "Error: " << matrix_name << " not found.\n";
+    std::exit(1);
+}
+
 void parse_matrix(FILE *f, struct matrix *x)
 {
+    if (x->dense) {
+        Coord longer_dim= max(x->ncols, x->nrows);
+        x->M_backing    = (Coord *)arena_push(global_persist, longer_dim*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
+        x->Mc_backing   = NULL;
+        x->M            = (Coord **)arena_push(global_persist, (x->nrows+1)*sizeof(*x->M), __alignof__(*x->M), 0);
+        x->Mc           = (Coord **)arena_push(global_persist, (x->ncols+1)*sizeof(*x->Mc), __alignof__(*x->Mc), 0);
+        x->offsetarrayM = (Coord *)arena_push(global_persist, (x->nrows+1)*sizeof(x->offsetarrayM[0]), __alignof__(x->offsetarrayM[0]), 0);
+        x->offsetarrayMc= (Coord *)arena_push(global_persist, (x->ncols+1)*sizeof(x->offsetarrayMc[0]), __alignof__(x->offsetarrayMc[0]), 0);
+
+        // trick: specify first row/col only (since they are all identical) and let all csr/csc entries alias to the same row/col
+        for (Coord i = 0; i < longer_dim; ++i)
+            x->M_backing[i] = i;
+
+        for (Coord i = 0; i < x->nrows+1; ++i) {
+            x->M[i]             = x->M_backing;
+            x->offsetarrayM[i]  = i*x->ncols;
+        }
+        for (Coord i = 0; i < x->ncols+1; ++i) {
+            x->Mc[i]            = x->M_backing;
+            x->offsetarrayMc[i] = i*x->nrows;
+        }
+
+        return;
+    }
     struct Arena_Mark mark = arena_snap(global_temp);
 
     b16 transpose = x->transpose;
@@ -702,7 +754,7 @@ void parse_matrix(FILE *f, struct matrix *x)
     Coord *raw_rows = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_rows), __alignof__(*raw_rows), 0);
     Coord *raw_cols = (Coord *)arena_push(global_temp, x->nzM*sizeof(*raw_cols), __alignof__(*raw_cols), 0);
     Coord *row_lens = (Coord *)arena_push(global_temp, x->nrows*sizeof(*row_lens), __alignof__(*row_lens), 1); // must be zeroed
-    Coord *col_lens = (Coord *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*row_lens), 1); // must be zeroed
+    Coord *col_lens = (Coord *)arena_push(global_temp, x->ncols*sizeof(*col_lens), __alignof__(*col_lens), 1); // must be zeroed
     Coord *offsets;
 
     x->M_backing    = (Coord *)arena_push(global_persist, x->nzM*sizeof(*x->M_backing), __alignof__(*x->M_backing), 0);
@@ -726,7 +778,7 @@ void parse_matrix(FILE *f, struct matrix *x)
         // assert(sscanf(readbuffer, "%lu %lu %lf %lf", &xx, &yy, &zz, &lala) >= 2);
         static_assert(sizeof(Coord) == sizeof(u64) || sizeof(Coord) == sizeof(u32), "unsupported Coord size");
         switch (sizeof(Coord)) {
-        case sizeof(u64): assert(sscanf(readbuffer, "%llu %llu", &xx, &yy) == 2);   break;
+        case sizeof(u64): assert(sscanf(readbuffer, "%u %u", &xx, &yy) == 2);   break;
         case sizeof(u32): assert(sscanf(readbuffer, "%u %u", &xx, &yy) == 2);       break;
         }
 
@@ -856,6 +908,10 @@ void reset_cursor(struct cursor *c)
     c->tk   = 0;
 }
 
+void release_global_persist() { arena_release(global_persist); }
+void release_global_temp()    { arena_release(global_temp);    }
+void release_cache_backing()  { arena_release(cache.backing);  }
+
 int main(int argc, char *argv[])
 {
     if (argc != 4) {
@@ -868,6 +924,10 @@ int main(int argc, char *argv[])
     global_persist  = arena_alloc(16*GB, MB);
     global_temp     = arena_alloc(16*GB, MB);
     cache.backing   = arena_alloc(16*GB, MB);
+
+    if(std::atexit(release_global_persist)) { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
+    if(std::atexit(release_global_temp))    { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
+    if(std::atexit(release_cache_backing))  { std::cerr << "Failed to register dealloc fn" << std::endl; return -1; }
 
     std::string matrix1_name    = argv[1];
     std::string matrix2_name    = argv[2];
@@ -890,6 +950,7 @@ int main(int argc, char *argv[])
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
     enum workload_mode requested_workload_mode = parse_workload_mode(config);
+    std::string dense_matrices = config["denseMatrix"].get<std::string>(); // "A", "B", "both", "neither", default neither
 
     cachesize = tmpsram * 262144 * 0.9;
     inputcachesize = cachesize;
@@ -901,8 +962,8 @@ int main(int argc, char *argv[])
     int tmpbank = config["srambank"].get<int>();
     sramBank = tmpbank;
 
-    std::string matrix1_filepath = "data/" + matrix1_name + ".mtx";
-    std::string matrix2_filepath = "data/" + matrix2_name + ".mtx";
+    std::string matrix1_filepath = get_matrix_path(matrix1_name);
+    std::string matrix2_filepath = get_matrix_path(matrix2_name);
     std::string output_filepath = output_dir
         +   (1 ? "C" : "_") // +   (ISCACHE ? "C" : "_")
         +   printDataFlow[dataflow]
@@ -912,7 +973,9 @@ int main(int argc, char *argv[])
         +   "GBs_" + std::to_string(tmpPE)
         +   "PEs_" + std::to_string(tmpbank) + "sbanks_"
         +   "_" + matrix1_name + "_" + matrix2_name + "_"
-        +   printFormat[format] + "_" + (transpose ? "1" : "0") + ".txt";
+        +   printFormat[format] + "_" + (transpose ? "1" : "0") 
+	+   "_dense_" + dense_matrices
+	+ ".txt";
 
     FILE *matrix1_file  = fopen(matrix1_filepath.c_str(), "r");
     FILE *matrix2_file  = fopen(matrix2_filepath.c_str(), "r");
@@ -931,16 +994,22 @@ int main(int argc, char *argv[])
             if (buf[0] != '%')
                 break;
         }
-        sscanf(buf, "%llu%llu%llu", &matA.nrows, &matA.ncols, &matA.nzM);
+        sscanf(buf, "%u%u%u", &matA.nrows, &matA.ncols, &matA.nzM);
 
         // read and ignore annotation '%' lines
         while (fgets(buf, TEMP_BUFFER_NBYTES, matrix2_file)) {
             if (buf[0] != '%')
                 break;
         }
-        sscanf(buf, "%llu%llu%llu", &matB.nrows, &matB.ncols, &matB.nzM);
+        sscanf(buf, "%u%u%u", &matB.nrows, &matB.ncols, &matB.nzM);
     }
 
+    matA.dense = dense_matrices == "A" || dense_matrices == "both";
+    matB.dense = dense_matrices == "B" || dense_matrices == "both";
+    if(matA.dense) matA.nzM = matA.nrows * matA.ncols;
+    if(matB.dense) matB.nzM = matB.nrows * matB.ncols;
+    // matA.dense = (b16)((matA.nrows*matA.ncols) == matA.nzM);
+    // matB.dense = (b16)((matB.nrows*matB.ncols) == matB.nzM);
     matA.transpose = (b16)transpose;
     matB.transpose = (b16)((matB.nrows == matB.ncols) ? transpose : !transpose);
     if (matA.transpose)
@@ -957,7 +1026,7 @@ int main(int argc, char *argv[])
         char buf[TEMP_BUFFER_NBYTES];
 
         assert(fgets(buf, TEMP_BUFFER_NBYTES, tile_file));
-        assert(sscanf(buf, "%llu%llu%llu", &t_i, &t_j, &t_k) == 3);
+        assert(sscanf(buf, "%u%u%u", &t_i, &t_j, &t_k) == 3);
     }
 
     const struct config cfg = {
@@ -969,12 +1038,12 @@ int main(int argc, char *argv[])
         .I          = matA.nrows,
         .J          = matA.ncols,
         .K          = matB.ncols,
-        .iii        = t_i,
-        .jjj        = t_j,
-        .kkk        = t_k,
         .tti        = div_rup(matA.nrows, t_i),
         .ttj        = div_rup(matA.ncols, t_j),
         .ttk        = div_rup(matB.ncols, t_k),
+        .iii        = t_i,
+        .jjj        = t_j,
+        .kkk        = t_k,
     };
     sim = initialize_simulator(&cfg);
     
@@ -1024,12 +1093,12 @@ int main(int argc, char *argv[])
     long long totaltagmatch48 = 0;
     long long totaltagmatch16 = 0;
 
-    for (int i = 1; i < sim.cfg.I; i++) {
+    for (uint32_t i = 1; i < sim.cfg.I; i++) {
         Coord size_im1 = offsetarrayA[i] - offsetarrayA[i-1];
         if (size_im1 < 48) {
             totalempty += (48 - size_im1);
         }
-        totalincache    += min(48, size_im1);
+        totalincache    += min(48u, size_im1);
         totaltagmatch48 += div_rup(size_im1, 48);
         totaltagmatch16 += div_rup(size_im1, 16);
     }
@@ -1143,12 +1212,12 @@ int main(int argc, char *argv[])
 
     /******************Config************************************/
 
-    printf("Matrix A: %llu x %llu, number of non-zeros = %llu\n", matA.nrows, matA.ncols, matA.nzM);
+    printf("Matrix A: %u x %u, number of non-zeros = %u\n", matA.nrows, matA.ncols, matA.nzM);
     printf("*** ratio of empty %lf, ratio of not empty %lf\n", totalempty / (sim.cfg.I * 48.0), 1 - (totalempty / (sim.cfg.I * 48.0)));
     printf("*** ratio of in cache %lf\n", totalincache / ((f64)matA.nzM));
     printf("** ratio tag access 48 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch48));
     printf("** ratio tag access 16 %lf\n", sim.cfg.I / ((f64)sim.cfg.I + totaltagmatch16));
-    printf("Matrix B: %llu x %llu, number of non-zeros = %llu\n", matB.nrows, matB.ncols, matB.nzM);
+    printf("Matrix B: %u x %u, number of non-zeros = %u\n", matB.nrows, matB.ncols, matB.nzM);
     printf("transpose: %d\n", matB.transpose);
     printf("I = %llu, K = %llu, J = %llu\n", sim.cfg.I, sim.cfg.K, sim.cfg.J);
     printf("workload mode requested = %s, selected = %s\n",
@@ -1204,7 +1273,7 @@ int main(int argc, char *argv[])
         // EWH
         // Incorporate SeaCache into baseline
         puts("***************** SeaCache *******************");
-        printf("nnzB:%llu  K:%llu  J/TJ:%llu  nzlB:%llu\n",
+        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
             matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
             matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
         );
@@ -1312,17 +1381,32 @@ int main(int argc, char *argv[])
 
     if (!baselinetest) {
         puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
+        // cribbed settings from SCACHE
+        ISCACHE = 1;
+        cachesize               = 262144;
+        CACHE_BLOCK_NELEMS      = 16;
+        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
+        setSET();
 
-        /*****************************************
+        cache.cfg = {
+            .block_nelems       = 1,
+            .block_nelems_log2  = 1,
+            .scheme             = CACHE_SCHEME_FLFU,
+        };
+
         adaptive_prefetch = 1;
-        useVirtualTag = 2;
-        cacheScheme;
+        cacheScheme = CACHE_SCHEME_FLFU;
         cachesize = inputcachesize;
 
-        runTile(kkk);
-        adaptive_prefetch = 0;
-        useVirtualTag = 0;
-        *****************************************/
+        // adaptive sparse-dense scheme, also uses virtual tag in sparse mode. Overloading this
+        // a little but it's ok.
+        useVirtualTag = 2;
+
+        reset_cursor(&sim.cursor);
+        runTile(sim.cfg.kkk);
+
+        printf("Dense installations: %lld\n", totalDenseInstalls);
+        printf("Dense hits: %lld\n", totalDenseHits);
     }
 
     bool ablationtest = 0;

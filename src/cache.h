@@ -53,7 +53,7 @@ extern enum cache_scheme cacheScheme;
 extern u64 CACHE_BLOCK_NELEMS;
 extern u64 CACHE_BLOCK_NELEMS_LOG2;
 
-extern bool useVirtualTag;
+extern std::uint8_t useVirtualTag;
 extern u64 inputcachesize;
 extern long long elements_processed_since_last_adjustment;
 

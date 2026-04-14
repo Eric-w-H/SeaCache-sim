@@ -17,10 +17,13 @@ import json
 import re
 import subprocess
 import sys
+import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+import ssgetpy
 
 
 METRIC_PATTERNS = {
@@ -47,6 +50,8 @@ class ExperimentConfig:
     srambank: int
     baselinetest: int
     condensedop: bool
+    denseA: bool
+    denseB: bool
 
     def json_obj(self, tile_dir: str, output_dir: str) -> Dict[str, object]:
         return {
@@ -59,13 +64,14 @@ class ExperimentConfig:
             "condensedOP": self.condensedop,
             "tileDir": tile_dir,
             "outputDir": output_dir,
+            "denseMatrix": "both" if self.denseA and self.denseB else ("A" if self.denseA and not self.denseB else ("B" if self.denseB and not self.denseA else "neither")),
         }
 
     def tag(self) -> str:
         condensed = 1 if self.condensedop else 0
         return (
             f"t{self.transpose}_c{self.cachesize:g}_bw{self.memorybandwidth:g}"
-            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}"
+            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}_dense_{"both" if self.denseA and self.denseB else ("A" if self.denseA and not self.denseB else ("B" if self.denseB and not self.denseA else "neither"))}"
         )
 
 
@@ -79,10 +85,10 @@ def discover_matrices(tile_dir: Path) -> List[str]:
 
 def matrix_file_path(matrix: str, roots: Sequence[Path]) -> Optional[Path]:
     for root in roots:
-        if root.name == "largedata":
-            candidate = root / matrix / f"{matrix}.mtx"
-        else:
-            candidate = root / f"{matrix}.mtx"
+        candidate = root / f"{matrix}.mtx"
+        if candidate.exists():
+            return candidate
+        candidate = root / matrix / f"{matrix}.mtx"
         if candidate.exists():
             return candidate
     return None
@@ -123,22 +129,49 @@ def validate_inputs(
 def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
     if args.profile == "quick":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, False),
+        ]
+
+    if args.profile == "quick-dense":
+        return [
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, True, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, True, False),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, True, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, False, True),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, True),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, False, True),
+        ]
+
+    if args.profile == "quick-baseline-dense":
+        return [
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, True, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, True, False),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, True, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, True),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, True),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, True),
+        ]
+
+    if args.profile == "quick-baseline":
+        return [
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, False, False),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, False, False),
         ]
 
     if args.profile == "balanced":
         return [
-            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False),
+            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False, False, False),
+            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False, False, False),
         ]
 
     if args.profile == "full":
@@ -180,7 +213,7 @@ def expected_output_filename(matrix: str, cfg: ExperimentConfig) -> str:
     prefix = "Base_" if cfg.baselinetest else "SeaCache_"
     return (
         f"CGust{prefix}{cfg.cachesize:.6f}MB_{cfg.memorybandwidth:.6f}GBs_"
-        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}.txt"
+        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}_dense_{"both" if cfg.denseA and cfg.denseB else ("A" if cfg.denseA and not cfg.denseB else ("B" if cfg.denseB and not cfg.denseA else "neither"))}.txt"
     )
 
 
@@ -258,9 +291,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--results-csv", default="./output/collected_results.csv", help="CSV file for extracted metrics")
     p.add_argument("--matrices", default="", help="Comma-separated matrix names (default: discover from tiles)")
     p.add_argument("--max-matrices", type=int, default=0, help="Limit number of matrices (0 means no limit)")
-    p.add_argument("--profile", choices=["quick", "balanced", "full"], default="balanced")
-    p.add_argument("--timeout", type=int, default=3600, help="Timeout per run in seconds")
-    p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs, skip simulator runs")
+    p.add_argument("--profile", choices=["quick", "quick-dense", "quick-baseline", "quick-baseline-dense", "balanced", "full"], default="balanced")
+    p.add_argument("--timeout", type=int, default=int(60*60*5), help="Timeout per run in seconds")
+    p.add_argument("--dry-run", action="store_true", help="Only validate + generate configs + download missing data, skip simulator runs.")
+    p.add_argument("--download-matrices", action="store_true", help="Download missing matrices into {--repo-root}/data")
+    p.add_argument("-j", "--jobs", type=int, default=1, help="Number of allowable parallel scache jobs.")
 
     # Used only when --profile full
     p.add_argument("--transpose-values", default="0")
@@ -308,6 +343,19 @@ def main(argv: Sequence[str]) -> int:
     for item, problem in problems:
         print(f"  - {item}: {problem}")
 
+    if args.download_matrices:
+        for matrix in matrices:
+            if matrix in valid_matrices:
+                continue
+            found = ssgetpy.search(matrix)
+            if len(found) == 1 and not args.dry_run:
+                print(f"Downloading {matrix} into {matrix_roots[0] / matrix}.mtx")
+                found.download('MM', matrix_roots[0], extract=True)
+                valid_matrices.append(matrix)
+            else:
+                print(f"Found {len(found)} candidate {'s' if len(found) > 1 else ''} for {matrix}. Skipping download...")
+                
+
     if not valid_matrices:
         print("No valid matrices found. Exiting.")
         return 1
@@ -326,28 +374,39 @@ def main(argv: Sequence[str]) -> int:
     total_jobs = len(valid_matrices) * len(configs)
     done_jobs = 0
 
-    for matrix in valid_matrices:
-        mtx_path = matrix_file_path(matrix, matrix_roots)
-        assert mtx_path is not None
+    with concurrent.futures.ThreadPoolExecutor(max_workers = max(1, args.jobs)) as executor:
+        # Use a dict to store the metadata along with the future
+        futures = {}
+        for matrix in valid_matrices:
+            mtx_path = matrix_file_path(matrix, matrix_roots)
+            assert mtx_path is not None
 
-        for cfg in configs:
-            done_jobs += 1
-            cfg_path = cfg_map[cfg]
-            print(
-                f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> running"
-                if not args.dry_run
-                else f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> dry run"
-            )
+            for cfg in configs:
+                done_jobs += 1
+                cfg_path = cfg_map[cfg]
+                print(
+                    f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> scheduled"
+                    if not args.dry_run
+                    else f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> dry run"
+                )
 
-            status, returncode, out_path, cmd = run_one(
-                scache_path=scache_path,
-                matrix=matrix,
-                cfg=cfg,
-                cfg_path=cfg_path,
-                output_dir=output_dir,
-                timeout_s=args.timeout,
-                dry_run=args.dry_run,
-            )
+                futures[executor.submit(run_one, 
+                        scache_path=scache_path,
+                        matrix=matrix,
+                        cfg=cfg,
+                        cfg_path=cfg_path,
+                        output_dir=output_dir,
+                        timeout_s=args.timeout,
+                        dry_run=args.dry_run,
+                )] = (done_jobs, matrix, mtx_path, cfg, cfg_path)
+
+        print()
+
+        for future in concurrent.futures.as_completed(futures):
+            # Recover the metadata and results
+            done_jobs, matrix, mtx_path, cfg, cfg_path = futures[future]
+            status, returncode, out_path, cmd = future.result()
+            print(f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> done")
 
             row: Dict[str, object] = {
                 "matrix": matrix,
@@ -364,6 +423,8 @@ def main(argv: Sequence[str]) -> int:
                 "srambank": cfg.srambank,
                 "baselinetest": cfg.baselinetest,
                 "condensedOP": int(cfg.condensedop),
+                "denseA": cfg.denseA,
+                "denseB": cfg.denseB,
             }
 
             if out_path and out_path.exists() and not args.dry_run:

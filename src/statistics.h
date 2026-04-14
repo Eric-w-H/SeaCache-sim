@@ -15,6 +15,9 @@ extern long long postDramAccess, postSramAccess;
 extern long long computeA, computeB, computeC;
 extern long long totalSram, totalDram, totalPE;
 
+// ewh: summaries of dense utilization
+extern long long totalDenseInstalls, totalDenseHits;
+
 // totalA/B/C correspond to all dram access (in the whole process)
 extern long long totalA, totalB, totalC;
 // preA, preB, postC correspond the the pre & post access
