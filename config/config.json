@@ -7,5 +7,8 @@
     "baselinetest": 1,
     "condensedOP": false,
     "tileDir": "./tiles/",
-    "outputDir": "./output/"
+    "outputDir": "./output/",
+    "denseMatrix": "neither",
+    "elemBytes": 8,
+    "coordBytes": 4
 }

@@ -15,6 +15,7 @@
 #define RATE_THRESHOLD      ((f64) 0.20)
 #define BIAS                ((u64) 23)
 
+
 // NOTE(ejs): I only enum-ified the cachescheme codes used/described in main.cpp.
 // some undecipherable magic slop remains in simulator.cpp. CACHE_SCHEME_BASE is
 // set to a high number so these enums (hopefully) do not conflict with the magic slop.
@@ -31,6 +32,12 @@ struct cache_config {
     u64 block_nelems;
     u64 block_nelems_log2;
     enum cache_scheme scheme;
+
+    u64 CACHE_BLOCK_BYTES;
+    u64 CACHE_BLOCK_DWORDS;
+    u64 CACHE_BLOCK_DWORDS_LOG2;
+    u64 CACHE_BLOCK_BYTES_PER_ELEM;  // one doubleword by default
+    u64 CACHE_BLOCK_BYTES_PER_COORD;
 };
 
 struct cache_stats {
@@ -49,9 +56,6 @@ extern struct cache cache;
 extern u64 cachesize;
 
 extern enum cache_scheme cacheScheme;
-
-extern u64 CACHE_BLOCK_NELEMS;
-extern u64 CACHE_BLOCK_NELEMS_LOG2;
 
 extern std::uint8_t useVirtualTag;
 extern u64 inputcachesize;
