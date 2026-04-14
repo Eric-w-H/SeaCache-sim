@@ -241,7 +241,7 @@ bool cacheHitPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
         _tag = getTag(addr);
 
         for(int i = 0; i < SETASSOC; ++i) {
-            if(Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag) && (Cnt[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING)) {
+            if(Valid[_set * SETASSOC + i] && (Tag[_set * SETASSOC + i] == _tag) && (PosOrig[_set * SETASSOC + i] == EXTRA_RESERVED_ENCODING) && (Cnt[_set * SETASSOC + i] == 0)) {
                 // cache hit, update LFU
                 updateLFUHit(_set, i);
                 totalDenseHits++;
