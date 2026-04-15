@@ -28,8 +28,13 @@ enum cache_scheme {
 
 
 struct cache_config {
-    u64 block_nelems;
-    u64 block_nelems_log2;
+    u32 block_nbytes;
+    u32 block_nwords;
+    u32 block_nwords_log2;
+    u32 block_nelems;
+    u32 block_nelems_log2;
+    u32 nsets;
+    u32 nsets_log2;
     enum cache_scheme scheme;
 };
 
@@ -46,12 +51,10 @@ struct cache {
 
 extern struct cache cache;
 
-extern u64 cachesize;
+extern u64 cache_nwords;
 
-extern enum cache_scheme cacheScheme;
-
-extern u64 CACHE_BLOCK_NELEMS;
-extern u64 CACHE_BLOCK_NELEMS_LOG2;
+// extern u64 cache.cfg.block_nwords;
+// extern u64 cache.cfg.block_nwords_log2;
 
 extern bool useVirtualTag;
 extern u64 inputcachesize;
@@ -93,8 +96,8 @@ extern long long totalaccess;
 extern int hitcnt;
 extern int misscnt;
 
-extern u64 CACHE_NSETS;
-extern u64 CACHE_NSETS_LOG2;
+// extern u64 cache.cfg.nsets;
+// extern u64 cache.cfg.nsets_log2;
 
 void initializeCacheValid();
 
@@ -109,7 +112,7 @@ int getSetPS(long long fiberId);
 long long getTagPS(long long fiberId);
 unsigned short getOrig(long long addr);
 
-void setSET();
+void setSET(u32 block_nbytes);
 
 void initialize_cache();
 

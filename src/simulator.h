@@ -2,6 +2,10 @@
 #define SIMULATOR_H
 
 struct config {
+    u32 elem_data_nbytes;
+    u32 elem_coord_nbytes;
+    u32 elem_nbytes;
+
     enum DataFlow   dataflow;
     enum InterOrder interorder;
     enum Format     format;

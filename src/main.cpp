@@ -15,6 +15,9 @@ This branch fixes a "read one past end of array allocation" bug for offsetarrayA
 #include <fstream>
 #include <filesystem>
 
+#define ELEM_DATA_NBYTES    8 // double-word
+#define ELEM_COORD_NBYTES   4 // word
+
 struct Arena *global_persist;
 struct Arena *global_temp;
 struct simulator_state sim;
@@ -194,64 +197,6 @@ void parse_matrix(FILE *f, struct matrix *x)
     arena_rewind(mark);
 }
 
-// struct matrix_tiling_config {
-//     struct Arena *a;
-//     Coord major_dim;
-//     Coord minor_dim;
-//     Coord minor_tile_dim;
-//     Coord **map;    // compressed sparse <axis> table
-//     Coord *offsets;
-// };
-// struct matrix_tiling_luts {
-//     Coord   **begins;
-//     Coord   **sizes;
-// };
-
-// struct matrix_tiling_luts
-// create_tiling_luts(const struct matrix_tiling_config *cfg)
-// {
-//     Coord   major_dim, minor_dim, minor_tile_dim, minor_ntiles;
-//     Coord   *offsets, **map;
-//     major_dim       = cfg->major_dim;
-//     minor_dim       = cfg->minor_dim;
-//     minor_tile_dim  = cfg->minor_tile_dim;
-//     minor_ntiles    = div_rup(minor_dim, minor_tile_dim);
-//     offsets         = cfg->offsets;
-//     map             = cfg->map;
-
-//     Coord begins[major_dim][minor_ntiles+1] = (Coord **)arena_push(cfg->a, major_dim*(minor_ntiles+1)*sizeof(**begins), __alignof__(**begins), 0);
-//     Coord sizes[major_dim][minor_ntiles]    = (Coord **)arena_push(cfg->a, major_dim*(minor_ntiles+1)*sizeof(**begins), __alignof__(**begins), 0);
-//     // sizes           = (Coord **)arena_push(cfg->a, major_dim*minor_tile_dim*sizeof(**sizes), __alignof__(**sizes), 1);
-//     printf("begins: %p\n", begins);
-//     printf("sizes: %p\n", sizes);
-//     fflush(stdout);
-
-//     for (Coord ri = 0; ri < major_dim; ++ri) {
-//         Coord nzero_elem_cnt= offsets[ri+1] - offsets[ri];
-//         Coord wj_tile_base  = 0;
-//         Coord wj            = 0;
-//         begins[ri][0]       = 0;
-//         for (Coord rj = 0; rj < nzero_elem_cnt; ++rj) {
-//             while (map[ri][rj] >= (wj_tile_base + minor_tile_dim)) {
-//                 wj_tile_base += minor_tile_dim;
-//                 ++wj;
-//                 begins[ri][wj] = rj;
-//             }
-//             ++sizes[ri][wj];
-//         }
-
-//         while (wj < minor_ntiles) {
-//             ++wj;
-//             begins[ri][wj] = nzero_elem_cnt;
-//         }
-//     }
-
-//     return (struct matrix_tiling_luts) {
-//         .begins = begins,
-//         .sizes  = sizes
-//     };
-// }
-
 void reset_cursor(struct cursor *c)
 {
     c->first= 1;
@@ -294,8 +239,8 @@ int main(int argc, char *argv[])
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
 
-    cachesize = tmpsram * 262144 * 0.9;
-    inputcachesize = cachesize;
+    cache_nwords = tmpsram * 262144 * 0.9;
+    inputcachesize = cache_nwords;
     HBMbandwidth = (tmpbandw / 4.0) * 0.6;
     int tmpPE = config["PEcnt"].get<int>();
     PEcnt = tmpPE;
@@ -366,6 +311,10 @@ int main(int argc, char *argv[])
     }
 
     const struct config cfg = {
+        .elem_data_nbytes   = 8, // double-word (f64)
+        .elem_coord_nbytes  = 4, // word (u32)
+        .elem_nbytes        = 12,
+
         .dataflow   = Gust,
         .interorder = IJK,
         .format     = RR,
@@ -445,50 +394,6 @@ int main(int argc, char *argv[])
     offsetarrayB = matB.offsetarrayM;
     offsetarrayBc= matB.offsetarrayMc;
 
-
-    // {
-    //     struct matrix_tiling_config tile_cfg = {.a = global_persist};
-    //     struct matrix_tiling_luts   luts;
-    //     b16 A_row_major = (dataflow == Inner) || (dataflow == Gust);
-    //     tile_cfg        = A_row_major
-    //         ? (struct matrix_tiling_config) {
-    //             .major_dim      = sim.cfg.I,
-    //             .minor_dim      = sim.cfg.J,
-    //             .minor_tile_dim = sim.cfg.jjj,
-    //             .map            = A,
-    //             .offsets        = offsetarrayA,
-    //         }
-    //         : (struct matrix_tiling_config) {
-    //             .major_dim      = sim.cfg.J,
-    //             .minor_dim      = sim.cfg.I,
-    //             .minor_tile_dim = sim.cfg.iii,
-    //             .map            = Ac,
-    //             .offsets        = offsetarrayAc,
-    //         };
-    //     luts = create_tiling_luts(&tile_cfg);
-    //     sim.beginsA = luts.begins;
-    //     sim.sizesA  = luts.sizes;
-
-    //     b16 B_row_major = (dataflow == Outer) || (dataflow == Gust);
-    //     tile_cfg        = B_row_major
-    //         ? (struct matrix_tiling_config) {
-    //             .major_dim      = sim.cfg.J,
-    //             .minor_dim      = sim.cfg.K,
-    //             .minor_tile_dim = sim.cfg.kkk,
-    //             .map            = B,
-    //             .offsets        = offsetarrayB,
-    //         }
-    //         : (struct matrix_tiling_config) {
-    //             .major_dim      = sim.cfg.K,
-    //             .minor_dim      = sim.cfg.J,
-    //             .minor_tile_dim = sim.cfg.jjj,
-    //             .map            = Bc,
-    //             .offsets        = offsetarrayBc,
-    //         };
-    //     luts = create_tiling_luts(&tile_cfg);
-    //     sim.beginsB = luts.begins;
-    //     sim.sizesB  = luts.sizes;
-    // }
 
     // WARNING: hardcoded cursor to IJK (tile-level), Gust (in-tile)
     {
@@ -572,40 +477,26 @@ int main(int argc, char *argv[])
         );
 
         ISCACHE = 1;
-        cachesize               = 262144;
-        CACHE_BLOCK_NELEMS      = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = getlog(CACHE_BLOCK_NELEMS);
-        setSET();
-
-        cache.cfg = {
-            .block_nelems       = 1,
-            .block_nelems_log2  = 1,
-            .scheme             = CACHE_SCHEME_FLFU,
-        };
-
-        adaptive_prefetch = 1;
-        useVirtualTag = 1;
-        cacheScheme = CACHE_SCHEME_FLFU;
-        cachesize = inputcachesize;
+        cache_nwords        = inputcachesize;
+        cache.cfg.scheme    = CACHE_SCHEME_FLFU;
+        setSET(16*4);
+        adaptive_prefetch   = 1;
+        useVirtualTag       = 1;
 
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
-        adaptive_prefetch = 0;
-        useVirtualTag = 0;
-
-        adaptive_prefetch = 0;
+        adaptive_prefetch   = 0;
+        useVirtualTag       = 0;
 
         ////////////  InnserSP
         // static FLRU + 16 words scheme0
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        prefetchSize = inputcachesize / 6;
-        cacheScheme = CACHE_SCHEME_INNER_SP;
-        cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
-        setSET();
+        prefetchSize    = inputcachesize / 6;
+        cache_nwords    = inputcachesize;
+        cache.cfg.scheme= CACHE_SCHEME_INNER_SP;
+        setSET(16*4);
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
@@ -613,56 +504,41 @@ int main(int argc, char *argv[])
         // dynamic FLRU + 128KB prefetch size + 144 words scheme0
         puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test Sparch   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        ISCACHE = 1;
-        cacheScheme = CACHE_SCHEME_SPARCH;
-        prefetchSize = inputcachesize / 6;
-        cachesize = inputcachesize - prefetchSize;
-        CACHE_BLOCK_NELEMS = 144;
-        CACHE_BLOCK_NELEMS_LOG2 = 8;
-        setSET();
+        prefetchSize    = inputcachesize / 6;
+        cache_nwords    = inputcachesize - prefetchSize;
+        cache.cfg.scheme= CACHE_SCHEME_SPARCH;
+        setSET(144*4);
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
         int newkkk = sim.cfg.kkk;
         int newttk = sim.cfg.ttk;
         // if can keep, just use current kkk
-        if (cachesize > sim.cfg.kkk * 2) {
-            cachesize -= sim.cfg.kkk * 2;
+        if (cache_nwords > sim.cfg.kkk * 2) {
+            cache_nwords -= sim.cfg.kkk * 2;
         } else {
             // if can't keep, use smaller kkk
             // (make kkk*2 to be half cachesize)
-            newkkk = cachesize / 4;
+            newkkk = cache_nwords / 4;
             newttk = (sim.cfg.K + sim.cfg.kkk - 1) / sim.cfg.kkk;
-            cachesize -= sim.cfg.kkk * 2;
+            cache_nwords -= sim.cfg.kkk * 2;
         }
         reset_cursor(&sim.cursor);
         runTile(newkkk);
-        // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
-        cachesize = inputcachesize;
-        setSET();
 
         ////////////  X-cache
         puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test X-cache   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         // LRU + 4 words scheme0
         // just same as using scheme0 with cacheline = 4
-        ISCACHE = 1;
-        cacheScheme = CACHE_SCHEME_BASE;
-        cachesize = inputcachesize;
-        CACHE_BLOCK_NELEMS = 4;
-        CACHE_BLOCK_NELEMS_LOG2 = 2;
-        setSET();
+        cache_nwords    = inputcachesize;
+        cache.cfg.scheme= CACHE_SCHEME_BASE;
+        setSET(4*4);
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
 
-        // return to the default setting
-        CACHE_BLOCK_NELEMS = 16;
-        CACHE_BLOCK_NELEMS_LOG2 = 4;
-        setSET();
-
         puts("!!!!!!!!!!!!!!!!!!!!  Scratchpad   !!!!!!!!!!!!!!!!!!!!!!!");
         ISCACHE = 0;
+        setSET(16*4);
 
         configPartial(0.05, 0.9, 0.05);
 
@@ -678,68 +554,13 @@ int main(int argc, char *argv[])
         /*****************************************
         adaptive_prefetch = 1;
         useVirtualTag = 2;
-        cacheScheme;
+        cache.cfg.scheme;
         cachesize = inputcachesize;
 
         runTile(kkk);
         adaptive_prefetch = 0;
         useVirtualTag = 0;
         *****************************************/
-    }
-
-    bool ablationtest = 0;
-    if (ablationtest) {
-
-        adaptive_prefetch = 0;
-
-        /////////////// ablation test
-
-        puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme0 (base)   "
-             "!!!!!!!!!!!!!!!!!!!!!!!!");
-        puts("CacheScheme 0");
-        ISCACHE = 1;
-        cacheScheme = CACHE_SCHEME_BASE;
-        cachesize = inputcachesize;
-        setSET();
-        runTile(sim.cfg.kkk);
-
-        puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme1 (mapping)   "
-             "!!!!!!!!!!!!!!!!!!!!!!!!");
-
-        puts("CacheScheme 1");
-        ISCACHE = 1;
-        cacheScheme = CACHE_SCHEME_MAPPING;
-        cachesize = inputcachesize;
-        setSET();
-        runTile(sim.cfg.kkk);
-
-        puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 without virtue   "
-             "!!!!!!!!!!!!!!!!!!!!!!!!");
-
-        useVirtualTag = 0;
-        cacheScheme = CACHE_SCHEME_FLFU;
-        cachesize = inputcachesize;
-        prefetchSize = cachesize / 6;
-        runTile(sim.cfg.kkk);
-
-        puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!! scheme88 with virtue   "
-             "!!!!!!!!!!!!!!!!!!!!!!!!");
-
-        puts("CacheScheme 88 practical FLFU  with virtual tag 1/6");
-        useVirtualTag = 1;
-        cacheScheme = CACHE_SCHEME_FLFU;
-        cachesize = inputcachesize;
-        prefetchSize = cachesize / 6;
-        runTile(sim.cfg.kkk);
-        useVirtualTag = 0;
-
-        puts("CacheScheme 88 practical FLFU  with virtual tag 1/16");
-        useVirtualTag = 1;
-        cacheScheme = CACHE_SCHEME_FLFU;
-        cachesize = inputcachesize;
-        prefetchSize = cachesize / 16;
-        runTile(sim.cfg.kkk);
-        useVirtualTag = 0;
     }
 
     return 0;

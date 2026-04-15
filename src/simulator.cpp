@@ -593,7 +593,7 @@ void get_A_fiber_col(int jj)
         AccessByte          += cost;
         computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
 
-        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+        if (cache.cfg.scheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
             computeDramAccess   += memoryBandwidthPE(cost);
             computeA            += memoryBandwidthPE(cost);
@@ -610,7 +610,7 @@ void get_A_fiber(int ii) {
     if (fulltagA == 0 || ii < fullA) {
         // hit
         computeSramAccess += sramReadBandwidth(cost);
-        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+        if (cache.cfg.scheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
             computeSramAccess += sramReadBandwidth(cost);
         }
@@ -620,7 +620,7 @@ void get_A_fiber(int ii) {
         AccessByte          += cost;
         computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
 
-        if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+        if (cache.cfg.scheme == CACHE_SCHEME_INNER_SP) {
             // f64 A access in static FLRU scheme
             computeDramAccess   += memoryBandwidthPE(cost);
             computeA            += memoryBandwidthPE(cost);
@@ -797,7 +797,7 @@ void get_B_fibers(int ii)
         if (hitA) {
             // hit
             computeSramAccess += sramReadBandwidth(cost);
-            if (cacheScheme == CACHE_SCHEME_INNER_SP)
+            if (cache.cfg.scheme == CACHE_SCHEME_INNER_SP)
                 computeSramAccess += sramReadBandwidth(cost);
         } else {
             computeDramAccess   += memoryBandwidthPE(cost);
@@ -805,7 +805,7 @@ void get_B_fibers(int ii)
             AccessByte          += cost;
             computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
 
-            if (cacheScheme == CACHE_SCHEME_INNER_SP) {
+            if (cache.cfg.scheme == CACHE_SCHEME_INNER_SP) {
                 computeDramAccess   += memoryBandwidthPE(cost);
                 computeA            += memoryBandwidthPE(cost);
                 computeSramAccess   += sramReadBandwidth(cost) + sramWriteBandwidth(cost);
@@ -895,12 +895,12 @@ bool prefetchrow(int ii) {
 
     int needsize = 0;
     // FLRU mode; need 2data+1coord+1next pointer (*4)
-    if (cacheScheme == 6 || cacheScheme == 7) {
+    if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7) {
         needsize = sim.cursor.A.sizes[ii - TI] * 4 + 1;
     }
     // FLFU mode; don't need next pointer (*3)
     // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
-    else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
+    else if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU) {
         needsize = sim.cursor.A.sizes[ii - TI] * 3;
     }
 
@@ -930,21 +930,21 @@ bool prefetchrow(int ii) {
         // in this prefetch: push the next access queue of jj a ii
         int jj = A[ii][tmpj];
 
-        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
-            cacheScheme == CACHE_SCHEME_SPARCH) {
+        if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == CACHE_SCHEME_INNER_SP ||
+            cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
             nextposvector[jj].push(-ii);
         }
-        if (cacheScheme == 66) {
+        if (cache.cfg.scheme == 66) {
             LFUtag[jj]++;
         }
 
         // practical flfu. update in the flubit
-        if (cacheScheme == CACHE_SCHEME_FLFU) {
+        if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
 
             long long firstaddr = getCacheAddr(jj, 0);
             int fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
-            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += CACHE_BLOCK_NELEMS) {
-                long long tmpaddr = getCacheAddr(jj, tmpcurr / CACHE_BLOCK_NELEMS);
+            for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
+                long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
 
                 int _set = getSet2(tmpaddr);
                 int _tag = getTag2(tmpaddr);
@@ -1129,7 +1129,7 @@ void update_prefetch_size() {
         current_prefetch_size = min(current_prefetch_size, 0.10);
 
         prefetchSize = current_prefetch_size * inputcachesize;
-        cachesize = inputcachesize - prefetchSize;
+        cache_nwords = inputcachesize - prefetchSize;
 
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
@@ -1178,7 +1178,7 @@ void update_prefetch_size() {
         lastaccept = 0;
 
         prefetchSize = current_prefetch_size * inputcachesize;
-        cachesize = inputcachesize - prefetchSize;
+        cache_nwords = inputcachesize - prefetchSize;
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
         prefetch_increments = 0;
@@ -1219,7 +1219,7 @@ void update_prefetch_size() {
     current_prefetch_size = min(current_prefetch_size, 0.1);
 
     prefetchSize = current_prefetch_size * inputcachesize;
-    cachesize = inputcachesize - prefetchSize;
+    cache_nwords = inputcachesize - prefetchSize;
 
     elements_processed_since_last_adjustment = 0;
     prefetch_discards = 0;
@@ -1254,11 +1254,11 @@ void calculate() {
         prefetchNow = 0;
 
         // all prefetch scheme
-        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-            cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
+        if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == 66 ||
+            cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
             // reinitialize the next pointer for FLRU
-            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
-                cacheScheme == CACHE_SCHEME_SPARCH) {
+            if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == CACHE_SCHEME_INNER_SP ||
+                cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
                 for (int j1 = TJ; j1 < min(TJ + sim.cfg.jjj, sim.cfg.J); j1++) {
                     while (!nextposvector[j1].empty()) {
                         nextposvector[j1].pop();
@@ -1266,7 +1266,7 @@ void calculate() {
                 }
             }
             // reinitialize the LFU tag for FLFU
-            if (cacheScheme == 66) {
+            if (cache.cfg.scheme == 66) {
                 // QUESTION(ejs): Note that len(LFUtag) = J (i.e. num cols in A / num rows in B).
                 // Why the hell is the LFUtag array being cleared to 0 every iteration?
                 // How can this be tracking the corresponding B row frequency accurately?
@@ -1298,16 +1298,16 @@ void calculate() {
 
             // update the prefetch window after each row
             // don't need to update prefetch window in static flru
-            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-                cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
+            if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == 66 ||
+                cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
 
                 // first minus this row's overhead
                 int needsize = 0;
-                if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_SPARCH) {
+                if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
                     needsize = sim.cursor.A.sizes[TI + ii] * 4 + 1;
                 }
                 // FLFU mode; don't need next pointer (*3)
-                if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
+                if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU) {
                     needsize = sim.cursor.A.sizes[TI + ii] * 3;
                 }
 
@@ -1445,9 +1445,9 @@ void calculate() {
 }
 
 void configPartial(f32 partialA, f32 partialB, f32 partialC) {
-    Asize = cachesize * partialA;
-    Bsize = cachesize * partialB;
-    Csize = cachesize * partialC;
+    Asize = cache_nwords * partialA;
+    Bsize = cache_nwords * partialB;
+    Csize = cache_nwords * partialC;
 }
 
 struct simulator_state initialize_simulator(const struct config *cfg)
@@ -1498,10 +1498,10 @@ void reinitialize() {
         initializeCacheValid();
 
         if (useVirtualTag) {
-            memset(virtualValid, 0, sizeof(bool) * CACHE_NSETS * VIRTUALSETASSOC);
+            memset(virtualValid, 0, sizeof(bool) * cache.cfg.nsets * VIRTUALSETASSOC);
         }
 
-        memset(PosOrig, 0, sizeof(short) * CACHE_NSETS * SETASSOC);
+        memset(PosOrig, 0, sizeof(short) * cache.cfg.nsets * SETASSOC);
     }
 
     // reinitialize buffer c
@@ -1604,8 +1604,8 @@ void run()
         current_prefetch_size = 1.0 / 128.0;
 
         prefetchSize = current_prefetch_size * inputcachesize;
-        cachesize = inputcachesize - prefetchSize;
-        setSET();
+        cache_nwords = inputcachesize - prefetchSize;
+        setSET(cache.cfg.block_nbytes);
 
         sa_iteration_k = 0;
         previous_prefetch_size = current_prefetch_size;
@@ -1656,51 +1656,51 @@ void runTile(int kkk)
     assert(ISCACHE);
 
     // deal with the opt metadata
-    if (cacheScheme == 6 || cacheScheme == 7) {
+    if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7) {
 
-        cachesize = inputcachesize - prefetchSize;
-        cachesize -= kkk * 2;
+        cache_nwords = inputcachesize - prefetchSize;
+        cache_nwords -= kkk * 2;
 
-        if (cachesize < 0) {
+        if (cache_nwords < 0) {
             puts("!!!!!! metadata out of range!!!!!!!!!!");
             fflush(stdout);
             return;
         }
 
-        setSET();
+        setSET(cache.cfg.block_nbytes);
     }
 
-    if (cacheScheme == 66) {
+    if (cache.cfg.scheme == 66) {
 
-        cachesize = inputcachesize - prefetchSize;
+        cache_nwords = inputcachesize - prefetchSize;
 
         // LFU tag size
-        cachesize -= kkk;
+        cache_nwords -= kkk;
 
-        if (cachesize < 0) {
+        if (cache_nwords < 0) {
             puts("!!!!!! metadata out of range!!!!!!!!!!");
             fflush(stdout);
             return;
         }
 
-        setSET();
+        setSET(cache.cfg.block_nbytes);
     }
 
-    if (cacheScheme == CACHE_SCHEME_FLFU) {
+    if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
 
-        cachesize = inputcachesize - prefetchSize;
+        cache_nwords = inputcachesize - prefetchSize;
 
-        setSET();
+        setSET(cache.cfg.block_nbytes);
     }
 
     // need to allocate extra tag space in address mode
     // the address space is depends on the tiling size (equal to jjj)
     // need to update: cachesize (actually Bsize?) + SET + SETLOG
-    if ((cacheScheme == 4) || (cacheScheme == 5) || (cacheScheme == 7)) {
+    if ((cache.cfg.scheme == 4) || (cache.cfg.scheme == 5) || (cache.cfg.scheme == 7)) {
         // need to add back after this calculation
-        cachesize = inputcachesize;
-        CACHE_NSETS = cachesize / (CACHE_BLOCK_NELEMS * SETASSOC);
-        CACHE_NSETS_LOG2 = getlog(CACHE_NSETS);
+        cache_nwords = inputcachesize;
+        cache.cfg.nsets = cache_nwords / (cache.cfg.block_nwords * SETASSOC);
+        cache.cfg.nsets_log2 = getlog(cache.cfg.nsets);
     }
 
     hitcnt = 0;
