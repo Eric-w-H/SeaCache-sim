@@ -28,8 +28,8 @@ void setSET(u32 block_nbytes)
 b8 *Valid = nullptr;
 i32 *Tag = nullptr;
 i32 *lrubit = nullptr;
-
 i32 *lfubit = nullptr;
+b8 *Dense = NULL;
 
 b8  *virtualValid = nullptr;
 i32 *virtualTag = nullptr;
@@ -688,6 +688,268 @@ bool cacheReadPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
     }
 }
 
+bool cache_hit_flfu_dense(long long addr, bool isfirst, long long firstaddr)
+{
+    int _set = getSet2(addr);
+    int _tag = getTag2(addr);
+
+    for (int i = 0; i < SETASSOC; i++) {
+        if (Valid[_set * SETASSOC + i]) {
+            // fuzzy compare
+            if ((Tag[_set * SETASSOC + i] <= _tag) && (_tag < Tag[_set * SETASSOC + i] + Cnt[_set * SETASSOC + i] + 1)) {
+
+                if (!isfirst) {
+                    // need to check orig
+                    if (PosOrig[_set * SETASSOC + i] != getOrig(firstaddr)) {
+                        // not the same orig
+                        continue;
+                    }
+                } else {
+                    // first
+                    if (PosOrig[_set * SETASSOC + i] != 0) {
+                        continue;
+                    }
+                }
+                // hit !!
+                // updatePracticalLFU; update without lfutime
+                if (lfubit[_set * SETASSOC + i]) {
+                    lfubit[_set * SETASSOC + i]--;
+                }
+
+                return 1;
+            }
+        }
+    }
+    // miss !
+    return 0;
+}
+
+void cache_replace_flfu_dense(long long addr, bool isfirst, long long firstaddr)
+{
+    int replaceindex = -1;
+    int replacelfu = LFUmax + 1;
+    int _set = getSet2(addr);
+    int _tag = getTag2(addr);
+
+    // calculate how many fibers can be loaded
+    int fibercnt = 1;
+    if (isfirst) {
+
+        int fiberid = addr >> cache.cfg.block_nwords_log2;
+        int tmpblocksize = cache.cfg.block_nwords;
+        tmpblocksize -= sim.cursor.B.sizes[fiberid - TJ] * 3;
+        while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + sim.cfg.jjj)) {
+            if (sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3 <= tmpblocksize) {
+                tmpblocksize -= sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3;
+                fibercnt++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    // check whether in virtual tag. only when useVirtualTag is true
+    bool invirtualtag = 0;
+    // only use when invirtualtag = 1;
+    int virtualindex;
+
+    // cache miss. if use virtual tag, check whether in virtual tag.
+    if (useVirtualTag) {
+        for (int i = 0; i < VIRTUALSETASSOC; i++) {
+            if (virtualValid[_set * VIRTUALSETASSOC + i]) {
+                if (virtualTag[_set * VIRTUALSETASSOC + i] == _tag) {
+                    // in virtual tag, then first update the virtual tag flfu (-1)
+                    // then check whether in cache has invalid or flfu less than this
+                    // if has, then put this into cache. if the replaced one is not
+                    // invalid, then put it into virtual tag.
+                    invirtualtag = 1;
+                    virtualindex = i;
+                    virtuallfubit[_set * VIRTUALSETASSOC + i]--;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < SETASSOC; i++) {
+        if (!Valid[_set * SETASSOC + i]) {
+            // if has invalid slot, use it without other considerations
+            replacelfu = -1;
+            replaceindex = i;
+            break;
+        } else {
+            int tmplfu = getlfubit(_set, i);
+
+            if (tmplfu < replacelfu) {
+                replacelfu = tmplfu;
+                replaceindex = i;
+            }
+        }
+    }
+
+    if (!useVirtualTag) {
+        // has invalid slot, fill
+        if (replacelfu == -1) {
+            Valid[_set * SETASSOC + replaceindex] = 1;
+            Tag[_set * SETASSOC + replaceindex] = _tag;
+            Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+            if (!isfirst) {
+                PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+            } else {
+                PosOrig[_set * SETASSOC + replaceindex] = 0;
+            }
+            initPracticalLFU(_set, replaceindex, 0);
+            return;
+        }
+
+        // has 0 slot, replace
+        if (replacelfu == 0) {
+            Valid[_set * SETASSOC + replaceindex] = 1;
+            Tag[_set * SETASSOC + replaceindex] = _tag;
+            Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+            if (!isfirst) {
+                PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+            } else {
+                PosOrig[_set * SETASSOC + replaceindex] = 0;
+            }
+            initPracticalLFU(_set, replaceindex, 0);
+            return;
+        }
+
+        // else, don't change the cache
+        return;
+    } else {
+        // use virtual tag
+        if (invirtualtag) {
+            // has invalid slot, fill, put the virtual tag slot to invalid
+            if (replacelfu == -1) {
+                // put current slot into cache
+                Valid[_set * SETASSOC + replaceindex] = 1;
+                Tag[_set * SETASSOC + replaceindex] = _tag;
+                Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+                if (!isfirst) {
+                    PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+                } else {
+                    PosOrig[_set * SETASSOC + replaceindex] = 0;
+                }
+                initPracticalLFU(_set, replaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
+
+                // put current virtual tag to invalid
+                virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 0;
+                return;
+            }
+
+            // a slot in cache has lfu less then this in virtual. replace.
+            if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
+                // update metadata in cache (config to the current access)
+                Valid[_set * SETASSOC + replaceindex] = 1;
+                int oldtag = Tag[_set * SETASSOC + replaceindex];
+                Tag[_set * SETASSOC + replaceindex] = _tag;
+                Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+                // int oldorig = PosOrig[_set * SETASSOC + replaceindex];
+                if (!isfirst) {
+                    PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+                } else {
+                    PosOrig[_set * SETASSOC + replaceindex] = 0;
+                }
+                initPracticalLFU(_set, replaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
+
+                // update metadata in virtual tag (config to the old slot in cache)
+                virtualValid[_set * VIRTUALSETASSOC + virtualindex] = 1;
+                virtualTag[_set * VIRTUALSETASSOC + virtualindex] = oldtag;
+                virtuallfubit[_set * VIRTUALSETASSOC + virtualindex] = replacelfu;
+            }
+        } else { // not in cache; not in virtual tag
+
+            // has invalid slot, fill
+            if (replacelfu == -1) {
+                Valid[_set * SETASSOC + replaceindex] = 1;
+                Tag[_set * SETASSOC + replaceindex] = _tag;
+                Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+                if (!isfirst) {
+                    PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+                } else {
+                    PosOrig[_set * SETASSOC + replaceindex] = 0;
+                }
+                initPracticalLFU(_set, replaceindex, 0);
+                return;
+            }
+
+            // has 0 slot, replace
+            if (replacelfu == 0) {
+                Valid[_set * SETASSOC + replaceindex] = 1;
+                Tag[_set * SETASSOC + replaceindex] = _tag;
+                Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
+                if (!isfirst) {
+                    PosOrig[_set * SETASSOC + replaceindex] = getOrig(firstaddr);
+                } else {
+                    PosOrig[_set * SETASSOC + replaceindex] = 0;
+                }
+
+                initPracticalLFU(_set, replaceindex, 0);
+                return;
+            }
+
+            // else, check whether can place into the virtual tag
+            // first put into invalid slot, if there is no invalid slot, then put into
+            // lfu=0 slot, if there is no lfu=0 slot, then do nothing
+            for (int i = 0; i < VIRTUALSETASSOC; i++) {
+                if (!virtualValid[_set * VIRTUALSETASSOC + i]) {
+                    // has an invalid slot, put here and return (don't need to check other
+                    // slots)
+                    virtualValid[_set * VIRTUALSETASSOC + i] = 1;
+                    virtualTag[_set * VIRTUALSETASSOC + i] = _tag;
+                    virtuallfubit[_set * VIRTUALSETASSOC + i] = 0;
+                    return;
+                } else {
+                }
+            }
+            for (int i = 0; i < VIRTUALSETASSOC; i++) {
+                if (!virtualValid[_set * VIRTUALSETASSOC + i]) {
+                } else {
+                    // valid
+                    if (virtuallfubit[_set * VIRTUALSETASSOC + i] == 0) {
+                        // if the flfu bit is 0, replace it. (according to lru, the current
+                        // is better)
+                        virtualValid[_set * VIRTUALSETASSOC + i] = 1;
+                        virtualTag[_set * VIRTUALSETASSOC + i] = _tag;
+                        virtuallfubit[_set * VIRTUALSETASSOC + i] = 0;
+
+                        return;
+                    }
+                    // else, can't do any operation
+                }
+            }
+            return;
+        }
+    }
+}
+
+bool cache_read_flfu_dense(long long addr, bool isfirst, long long firstaddr)
+{
+    totalaccess++;
+    data_access_total++;
+
+    // cache hit!
+    if (cache_hit_flfu_dense(addr, isfirst, firstaddr)) {
+        totalhit++;
+        data_access_hit++;
+        // sram read
+        computeSramAccess += sramReadBandwidth(cache.cfg.block_nwords);
+        return 1;
+    }
+    // cache miss
+    else {
+        // dram load
+        computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
+        // sram write
+        computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords);
+        computeB += memoryBandwidthPE(cache.cfg.block_nwords);
+        // update cache status
+        cache_replace_flfu_dense(addr, isfirst, firstaddr);
+        return 0;
+    }
+}
+
 void initializeCacheValid() {
     memset(Valid, 0, sizeof(bool) * cache.cfg.nsets * SETASSOC);
     if (useVirtualTag) {
@@ -952,6 +1214,24 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
             computeB += memoryBandwidthPE(cache.cfg.block_nwords);
         }
     }
+
+    if (cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
+        bool anymiss = 0;
+        fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
+        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
+            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
+            bool tmphit = cacheReadPracticalLFU(tmpaddr, tmpcurr == 0, getCacheAddr(jj, 0));
+            if (!tmphit) {
+                anymiss = 1;
+            }
+        }
+        if (anymiss) {
+            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords);
+
+            computeB += memoryBandwidthPE(cache.cfg.block_nwords);
+        }
+    }
 }
 
 // (re-)allocate memory dynamically
@@ -968,6 +1248,7 @@ void initialize_cache()
         arena_clear(cache.backing);
         Valid          = (b8  *)arena_push(cache.backing, nblocks         * sizeof(*Valid),          __alignof__(*Valid),          1);
         Tag            = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*Tag),            __alignof__(*Tag),            0);
+        Dense          = (b8  *)arena_push(cache.backing, nblocks         * sizeof(*Dense),          __alignof__(*Dense),          0);
         lrubit         = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*lrubit),         __alignof__(*lrubit),         0);
         lfubit         = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*lfubit),         __alignof__(*lfubit),         0);
 

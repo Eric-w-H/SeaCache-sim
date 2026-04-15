@@ -22,6 +22,7 @@ enum cache_scheme {
     CACHE_SCHEME_BASE = 1000000, // formerly magic 0
     CACHE_SCHEME_MAPPING,        // formerly magic 1
     CACHE_SCHEME_FLFU,           // formerly magic 88
+    CACHE_SCHEME_FLFU_DENSE,
     CACHE_SCHEME_INNER_SP,       // formerly magic 11100
     CACHE_SCHEME_SPARCH          // formerly magic 11101
 };
@@ -68,8 +69,8 @@ extern int *LFUtag;
 extern b8 *Valid;
 extern i32 *Tag;
 extern i32 *lrubit;
-
 extern i32 *lfubit;
+extern b8 *Dense;
 
 extern b8 *virtualValid;
 extern i32 *virtualTag;
