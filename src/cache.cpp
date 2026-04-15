@@ -78,28 +78,28 @@ enum cache_scheme cacheScheme;
 long long getCacheAddr(int fiberid, int relative) {
     long long ret;
 
-    ret = (((long long)fiberid) << cache.cfg.CACHE_BLOCK_DWORDS_LOG2);
+    ret = (((long long)fiberid) << cache.cfg.CACHE_BLOCK_WORDS_LOG2);
     if (relative) {
-        ret += (((long long)relative) << (cache.cfg.CACHE_BLOCK_DWORDS_LOG2 + BIAS));
+        ret += (((long long)relative) << (cache.cfg.CACHE_BLOCK_WORDS_LOG2 + BIAS));
     }
 
     return ret;
 }
 
 // mapping: tag | set index | offset within cacheblock
-unsigned int getSet(long long addr) { return (addr >> (cache.cfg.CACHE_BLOCK_DWORDS_LOG2)) % CACHE_NSETS; }
+unsigned int getSet(long long addr) { return (addr >> (cache.cfg.CACHE_BLOCK_WORDS_LOG2)) % CACHE_NSETS; }
 
 unsigned int getTag(long long addr) {
-    return (addr >> (cache.cfg.CACHE_BLOCK_DWORDS_LOG2 + CACHE_NSETS_LOG2));
+    return (addr >> (cache.cfg.CACHE_BLOCK_WORDS_LOG2 + CACHE_NSETS_LOG2));
 }
 
 // mapping: tag-H | set index | tag-L | offset within cacheblock
 unsigned int getSet2(long long addr) {
-    return (addr >> (cache.cfg.CACHE_BLOCK_DWORDS_LOG2 + N_TAG_L_BITS)) % CACHE_NSETS;
+    return (addr >> (cache.cfg.CACHE_BLOCK_WORDS_LOG2 + N_TAG_L_BITS)) % CACHE_NSETS;
 }
 
 unsigned int getTag2(long long addr) {
-    long long fiberId = addr >> cache.cfg.CACHE_BLOCK_DWORDS_LOG2;
+    long long fiberId = addr >> cache.cfg.CACHE_BLOCK_WORDS_LOG2;
     long long tag_h = fiberId >> (N_TAG_L_BITS + CACHE_NSETS_LOG2);
     long long tag_l = fiberId & ((1 << N_TAG_L_BITS) - 1);
     int _tag = (tag_h << N_TAG_L_BITS) | tag_l;
@@ -117,7 +117,7 @@ long long getTagPS(long long fiberId) {
 }
 
 u16 getOrig(long long addr) {
-    return (addr >> cache.cfg.CACHE_BLOCK_DWORDS_LOG2) & ((1 << N_EXTRA_BITS) - 1);
+    return (addr >> cache.cfg.CACHE_BLOCK_WORDS_LOG2) & ((1 << N_EXTRA_BITS) - 1);
 }
 
 // = 0 when don't use virtual tag
@@ -362,7 +362,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
     int fibercnt = 1;
     if (isfirst) {
 
-        int fiberid = addr >> cache.cfg.CACHE_BLOCK_DWORDS_LOG2;
+        int fiberid = addr >> cache.cfg.CACHE_BLOCK_WORDS_LOG2;
         int tmpblocksize = cache.cfg.CACHE_BLOCK_BYTES;
         tmpblocksize -= sim.cursor.B.sizes[fiberid - TJ] * (cache.cfg.CACHE_BLOCK_BYTES_PER_ELEM + cache.cfg.CACHE_BLOCK_BYTES_PER_COORD); // n data words + 1 coordinate word
         while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + sim.cfg.jjj)) {
@@ -417,7 +417,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         // has invalid slot, fill
         if (replacelfu == -1) {
             Valid[_set * SETASSOC + replaceindex] = 1;
-	    Dense[_set * SETASSOC + replaceindex] = 0;
+            Dense[_set * SETASSOC + replaceindex] = 0;
             Tag[_set * SETASSOC + replaceindex] = _tag;
             Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
             if (!isfirst) {
@@ -432,7 +432,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
         // has 0 slot, replace
         if (replacelfu == 0) {
             Valid[_set * SETASSOC + replaceindex] = 1;
-	    Dense[_set * SETASSOC + replaceindex] = 0;
+            Dense[_set * SETASSOC + replaceindex] = 0;
             Tag[_set * SETASSOC + replaceindex] = _tag;
             Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
             if (!isfirst) {
@@ -453,7 +453,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             if (replacelfu == -1) {
                 // put current slot into cache
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 0;
+                Dense[_set * SETASSOC + replaceindex] = 0;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
                 if (!isfirst) {
@@ -472,7 +472,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
                 // update metadata in cache (config to the current access)
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 0;
+                Dense[_set * SETASSOC + replaceindex] = 0;
                 int oldtag = Tag[_set * SETASSOC + replaceindex];
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
@@ -496,7 +496,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             // has invalid slot, fill
             if (replacelfu == -1) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 0;
+                Dense[_set * SETASSOC + replaceindex] = 0;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
                 if (!isfirst) {
@@ -511,7 +511,7 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
             // has 0 slot, replace
             if (replacelfu == 0) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 0;
+                Dense[_set * SETASSOC + replaceindex] = 0;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = fibercnt - 1;
                 if (!isfirst) {
@@ -608,7 +608,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
         // has invalid slot, fill
         if (replacelfu == -1) {
             Valid[_set * SETASSOC + replaceindex] = 1;
-	    Dense[_set * SETASSOC + replaceindex] = 1;
+            Dense[_set * SETASSOC + replaceindex] = 1;
             Tag[_set * SETASSOC + replaceindex] = _tag;
             Cnt[_set * SETASSOC + replaceindex] = 0;
             initPracticalLFU(_set, replaceindex, 0);
@@ -618,7 +618,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
         // has 0 slot, replace
         if (replacelfu == 0) {
             Valid[_set * SETASSOC + replaceindex] = 1;
-	    Dense[_set * SETASSOC + replaceindex] = 1;
+            Dense[_set * SETASSOC + replaceindex] = 1;
             Tag[_set * SETASSOC + replaceindex] = _tag;
             Cnt[_set * SETASSOC + replaceindex] = 0;
             initPracticalLFU(_set, replaceindex, 0);
@@ -634,7 +634,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
             if (replacelfu == -1) {
                 // put current slot into cache
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 1;
+                Dense[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = 0;
                 initPracticalLFU(_set, replaceindex, virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]);
@@ -648,7 +648,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
             if (replacelfu < virtuallfubit[_set * VIRTUALSETASSOC + virtualindex]) {
                 // update metadata in cache (config to the current access)
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 1;
+                Dense[_set * SETASSOC + replaceindex] = 1;
                 int oldtag = Tag[_set * SETASSOC + replaceindex];
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = 0;
@@ -666,7 +666,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
             // has invalid slot, fill
             if (replacelfu == -1) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 1;
+                Dense[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = 0;
                 initPracticalLFU(_set, replaceindex, 0);
@@ -676,7 +676,7 @@ void cacheReplacePracticalDenseLFU(long long addr) {
             // has 0 slot, replace
             if (replacelfu == 0) {
                 Valid[_set * SETASSOC + replaceindex] = 1;
-	        Dense[_set * SETASSOC + replaceindex] = 1;
+                Dense[_set * SETASSOC + replaceindex] = 1;
                 Tag[_set * SETASSOC + replaceindex] = _tag;
                 Cnt[_set * SETASSOC + replaceindex] = 0;
 
@@ -750,17 +750,17 @@ bool cacheRead(long long addr)
         totalhit++;
         data_access_hit++;
         // sram read
-        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         hitcnt++;
         return 1;
     } else {
         // cache miss
         // dram load
-        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // sram write
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
 
-        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
 
         // update cache status
         cacheReplace(addr);
@@ -812,17 +812,17 @@ bool cacheReadOPT(long long addr, int nextpos) {
         totalhit++;
         data_access_hit++;
         // sram read
-        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         return 1;
     }
     // cache miss
     else {
         // dram load
-        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // sram write
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
 
-        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
 
         // update cache status
         cacheReplaceOPT(addr, nextpos);
@@ -838,16 +838,16 @@ bool cacheReadOPTLFU(long long addr, int lfutime) {
         totalhit++;
         data_access_hit++;
         // sram read
-        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         return 1;
     }
     // cache miss
     else {
         // dram load
-        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // sram write
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // update cache status
         cacheReplaceOPTLFU(addr, lfutime);
         return 0;
@@ -887,16 +887,16 @@ bool cacheReadPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
         totalhit++;
         data_access_hit++;
         // sram read
-        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         return 1;
     }
     // cache miss
     else {
         // dram load
-        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // sram write
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // update cache status
         cacheReplacePracticalLFU(addr, isfirst, firstaddr);
         return 0;
@@ -923,11 +923,11 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         bool tmphit = cacheRead(tmpaddr);
 
         // the exceed part will miss anyway
-        if (fibersize > cache.cfg.CACHE_BLOCK_DWORDS) {
+        if (fibersize > cache.cfg.CACHE_BLOCK_WORDS) {
             // int loadsize = fibersize - CACHEBLOCK;
             int loadsize =
-                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS)) * cache.cfg.CACHE_BLOCK_DWORDS;
-            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS));
+                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS)) * cache.cfg.CACHE_BLOCK_WORDS;
+            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS));
             // dram load
             computeDramAccess += memoryBandwidthPE(loadsize);
             // sram write
@@ -938,10 +938,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // someblock miss, need to access the dram metadata
         // need to know where to fetch the dram fiber first before the fetching
         if (!tmphit) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
             // sram write
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -953,10 +953,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // will be set to 1 if any cacheblock is miss
         // (need extra dram access)
         bool anymiss = 0;
-        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_DWORDS) {
+        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_WORDS) {
 
             // the address alters in different cache schemes
-            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_DWORDS);
+            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_WORDS);
 
             // the read granularity alters in different cache schemes
 
@@ -993,7 +993,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // a for loop for each related cacheline. (may more then scehme1)
 
         // the begin block is the block which contains the start tmpaddr
-        int beginaddr = tmpaddr - (tmpaddr % cache.cfg.CACHE_BLOCK_DWORDS);
+        int beginaddr = tmpaddr - (tmpaddr % cache.cfg.CACHE_BLOCK_WORDS);
         // the start addr of the end block of the fiber
         // int endaddr = (tmpaddr+fibersize)-((tmpaddr+fibersize-1)%CACHEBLOCK+1);
         int endaddr = tmpaddr + fibersize;
@@ -1007,7 +1007,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
         bool anymiss = 0;
 
-        for (int tmpcurr = beginaddr; tmpcurr < endaddr; tmpcurr += cache.cfg.CACHE_BLOCK_DWORDS) {
+        for (int tmpcurr = beginaddr; tmpcurr < endaddr; tmpcurr += cache.cfg.CACHE_BLOCK_WORDS) {
 
             bool tmphit = cacheRead(tmpcurr);
 
@@ -1019,10 +1019,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // someblock miss, need to access the dram metadata
         if (anymiss && (!srammetahit)) {
 
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
             // sram write
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -1035,13 +1035,13 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // send the now I ii
         int nextpos = getNextpos(jj, ii);
         // access the head pointer
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         bool anymiss = 0;
 
-        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_DWORDS) {
+        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_WORDS) {
 
             // the address alters in different cache schemes
-            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_DWORDS);
+            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_WORDS);
             // the read granularity alters in different cache schemes
             bool tmphit = cacheReadOPT(tmpaddr, nextpos);
             if (!tmphit) {
@@ -1051,10 +1051,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
         // someblock miss, need to access the dram metadata
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
             // sram write
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -1063,17 +1063,17 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     if (cacheScheme == CACHE_SCHEME_INNER_SP) {
         int nextpos = getNextpos(jj, ii);
         // access the head pointer
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         // bool anymiss = 0;
 
         long long tmpaddr = getCacheAddr(jj, 0);
         bool tmphit = cacheReadOPT(tmpaddr, nextpos);
         // the exceed part will miss anyway
-        if (fibersize > cache.cfg.CACHE_BLOCK_DWORDS) {
+        if (fibersize > cache.cfg.CACHE_BLOCK_WORDS) {
             // int loadsize = fibersize - CACHEBLOCK;
             int loadsize =
-                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS)) * cache.cfg.CACHE_BLOCK_DWORDS;
-            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS));
+                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS)) * cache.cfg.CACHE_BLOCK_WORDS;
+            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS));
             // dram load
             computeDramAccess += memoryBandwidthPE(loadsize);
             // sram write
@@ -1084,10 +1084,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // someblock miss, need to access the dram metadata
         // need to know where to fetch the dram fiber first before the fetching
         if (!tmphit) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
             // sram write
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -1096,17 +1096,17 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     if (cacheScheme == CACHE_SCHEME_SPARCH) {
         int nextpos = getNextpos(jj, ii);
         // access the head pointer
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         // bool anymiss = 0;
 
         long long tmpaddr = getCacheAddr(jj, 0);
         bool tmphit = cacheReadOPT(tmpaddr, nextpos);
         // the exceed part will miss anyway
-        if (fibersize > cache.cfg.CACHE_BLOCK_DWORDS) {
+        if (fibersize > cache.cfg.CACHE_BLOCK_WORDS) {
             // int loadsize = fibersize - CACHEBLOCK;
             int loadsize =
-                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS)) * cache.cfg.CACHE_BLOCK_DWORDS;
-            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_DWORDS - 1) / cache.cfg.CACHE_BLOCK_DWORDS));
+                (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS)) * cache.cfg.CACHE_BLOCK_WORDS;
+            totalaccess += (1 + ((fibersize - cache.cfg.CACHE_BLOCK_WORDS - 1) / cache.cfg.CACHE_BLOCK_WORDS));
             // dram load
             computeDramAccess += memoryBandwidthPE(loadsize);
             // sram write
@@ -1117,10 +1117,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // someblock miss, need to access the dram metadata
         // need to know where to fetch the dram fiber first before the fetching
         if (!tmphit) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
             // sram write
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -1130,20 +1130,20 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // use the getNextposLFU to get the LFU
         int lfutime = getLFU(jj, ii);
         // access the head pointer
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         bool anymiss = 0;
-        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_DWORDS) {
-            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_DWORDS);
+        for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.CACHE_BLOCK_WORDS) {
+            long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.CACHE_BLOCK_WORDS);
             bool tmphit = cacheReadOPTLFU(tmpaddr, lfutime);
             if (!tmphit) {
                 anymiss = 1;
             }
         }
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
 
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
@@ -1162,10 +1162,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         }
 
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
 
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 
