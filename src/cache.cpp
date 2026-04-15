@@ -3,15 +3,7 @@
 #include "statistics.h"
 #include "util.h"
 
-u64 cache_nwords = 262144;
-
-// u64 cache.cfg.block_nwords      = 16; // 1 word = 32 bits
-// u64 cache.cfg.block_nwords_log2 = 4;
-
-u64 inputcachesize;
-
-// u64 cache.cfg.nsets     = cache_nwords / (cache.cfg.block_nwords * SETASSOC);
-// u64 cache.cfg.nsets_log2= getlog(cache.cfg.nsets);
+u64 input_cfg_cache_nwords;
 
 // Params: cachesize, cacheblock
 void setSET(u32 block_nbytes)
@@ -28,7 +20,7 @@ void setSET(u32 block_nbytes)
     // cfg->scheme             = scheme;
     // cache.cfg.block_nbytes = block_nbytes;
 
-    cache.cfg.nsets         = (cache_nwords) / (cache.cfg.block_nwords * SETASSOC);
+    cache.cfg.nsets         = (cache.cfg.cache_nwords) / (cache.cfg.block_nwords * SETASSOC);
     cache.cfg.nsets_log2    = getlog(cache.cfg.nsets);
     initialize_cache();
 }

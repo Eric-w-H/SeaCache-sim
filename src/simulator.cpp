@@ -1128,8 +1128,8 @@ void update_prefetch_size() {
         current_prefetch_size = max(current_prefetch_size, 1.0 / 256.0);
         current_prefetch_size = min(current_prefetch_size, 0.10);
 
-        prefetchSize = current_prefetch_size * inputcachesize;
-        cache_nwords = inputcachesize - prefetchSize;
+        prefetchSize = current_prefetch_size * input_cfg_cache_nwords;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
 
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
@@ -1177,8 +1177,8 @@ void update_prefetch_size() {
 
         lastaccept = 0;
 
-        prefetchSize = current_prefetch_size * inputcachesize;
-        cache_nwords = inputcachesize - prefetchSize;
+        prefetchSize = current_prefetch_size * input_cfg_cache_nwords;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
         elements_processed_since_last_adjustment = 0;
         prefetch_discards = 0;
         prefetch_increments = 0;
@@ -1218,8 +1218,8 @@ void update_prefetch_size() {
     current_prefetch_size = max(current_prefetch_size, 1.0 / 256.0);
     current_prefetch_size = min(current_prefetch_size, 0.1);
 
-    prefetchSize = current_prefetch_size * inputcachesize;
-    cache_nwords = inputcachesize - prefetchSize;
+    prefetchSize = current_prefetch_size * input_cfg_cache_nwords;
+    cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
 
     elements_processed_since_last_adjustment = 0;
     prefetch_discards = 0;
@@ -1445,9 +1445,9 @@ void calculate() {
 }
 
 void configPartial(f32 partialA, f32 partialB, f32 partialC) {
-    Asize = cache_nwords * partialA;
-    Bsize = cache_nwords * partialB;
-    Csize = cache_nwords * partialC;
+    Asize = cache.cfg.cache_nwords * partialA;
+    Bsize = cache.cfg.cache_nwords * partialB;
+    Csize = cache.cfg.cache_nwords * partialC;
 }
 
 struct simulator_state initialize_simulator(const struct config *cfg)
@@ -1603,8 +1603,8 @@ void run()
 
         current_prefetch_size = 1.0 / 128.0;
 
-        prefetchSize = current_prefetch_size * inputcachesize;
-        cache_nwords = inputcachesize - prefetchSize;
+        prefetchSize = current_prefetch_size * input_cfg_cache_nwords;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
         setSET(cache.cfg.block_nbytes);
 
         sa_iteration_k = 0;
@@ -1658,10 +1658,10 @@ void runTile(int kkk)
     // deal with the opt metadata
     if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7) {
 
-        cache_nwords = inputcachesize - prefetchSize;
-        cache_nwords -= kkk * 2;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
+        cache.cfg.cache_nwords -= kkk * 2;
 
-        if (cache_nwords < 0) {
+        if (cache.cfg.cache_nwords < 0) {
             puts("!!!!!! metadata out of range!!!!!!!!!!");
             fflush(stdout);
             return;
@@ -1672,12 +1672,12 @@ void runTile(int kkk)
 
     if (cache.cfg.scheme == 66) {
 
-        cache_nwords = inputcachesize - prefetchSize;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
 
         // LFU tag size
-        cache_nwords -= kkk;
+        cache.cfg.cache_nwords -= kkk;
 
-        if (cache_nwords < 0) {
+        if (cache.cfg.cache_nwords < 0) {
             puts("!!!!!! metadata out of range!!!!!!!!!!");
             fflush(stdout);
             return;
@@ -1688,7 +1688,7 @@ void runTile(int kkk)
 
     if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
 
-        cache_nwords = inputcachesize - prefetchSize;
+        cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
 
         setSET(cache.cfg.block_nbytes);
     }
@@ -1698,8 +1698,8 @@ void runTile(int kkk)
     // need to update: cachesize (actually Bsize?) + SET + SETLOG
     if ((cache.cfg.scheme == 4) || (cache.cfg.scheme == 5) || (cache.cfg.scheme == 7)) {
         // need to add back after this calculation
-        cache_nwords = inputcachesize;
-        cache.cfg.nsets = cache_nwords / (cache.cfg.block_nwords * SETASSOC);
+        cache.cfg.cache_nwords = input_cfg_cache_nwords;
+        cache.cfg.nsets = cache.cfg.cache_nwords / (cache.cfg.block_nwords * SETASSOC);
         cache.cfg.nsets_log2 = getlog(cache.cfg.nsets);
     }
 

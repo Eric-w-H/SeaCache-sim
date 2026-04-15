@@ -28,6 +28,8 @@ enum cache_scheme {
 
 
 struct cache_config {
+    u32 cache_nwords;
+
     u32 block_nbytes;
     u32 block_nwords;
     u32 block_nwords_log2;
@@ -51,13 +53,11 @@ struct cache {
 
 extern struct cache cache;
 
-extern u64 cache_nwords;
-
 // extern u64 cache.cfg.block_nwords;
 // extern u64 cache.cfg.block_nwords_log2;
 
 extern bool useVirtualTag;
-extern u64 inputcachesize;
+extern u64 input_cfg_cache_nwords;
 extern long long elements_processed_since_last_adjustment;
 
 extern queue<int> *nextposvector;

@@ -239,8 +239,8 @@ int main(int argc, char *argv[])
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
 
-    cache_nwords = tmpsram * 262144 * 0.9;
-    inputcachesize = cache_nwords;
+    cache.cfg.cache_nwords = tmpsram * 262144 * 0.9;
+    input_cfg_cache_nwords = cache.cfg.cache_nwords;
     HBMbandwidth = (tmpbandw / 4.0) * 0.6;
     int tmpPE = config["PEcnt"].get<int>();
     PEcnt = tmpPE;
@@ -477,7 +477,7 @@ int main(int argc, char *argv[])
         );
 
         ISCACHE = 1;
-        cache_nwords        = inputcachesize;
+        cache.cfg.cache_nwords        = input_cfg_cache_nwords;
         cache.cfg.scheme    = CACHE_SCHEME_FLFU;
         setSET(16*4);
         adaptive_prefetch   = 1;
@@ -493,8 +493,8 @@ int main(int argc, char *argv[])
         // static FLRU + 16 words scheme0
         puts("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test InnerSP   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        prefetchSize    = inputcachesize / 6;
-        cache_nwords    = inputcachesize;
+        prefetchSize    = input_cfg_cache_nwords / 6;
+        cache.cfg.cache_nwords    = input_cfg_cache_nwords;
         cache.cfg.scheme= CACHE_SCHEME_INNER_SP;
         setSET(16*4);
         reset_cursor(&sim.cursor);
@@ -504,8 +504,8 @@ int main(int argc, char *argv[])
         // dynamic FLRU + 128KB prefetch size + 144 words scheme0
         puts("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   test Sparch   "
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        prefetchSize    = inputcachesize / 6;
-        cache_nwords    = inputcachesize - prefetchSize;
+        prefetchSize    = input_cfg_cache_nwords / 6;
+        cache.cfg.cache_nwords    = input_cfg_cache_nwords - prefetchSize;
         cache.cfg.scheme= CACHE_SCHEME_SPARCH;
         setSET(144*4);
         // calculate metadata overhead.
@@ -513,14 +513,14 @@ int main(int argc, char *argv[])
         int newkkk = sim.cfg.kkk;
         int newttk = sim.cfg.ttk;
         // if can keep, just use current kkk
-        if (cache_nwords > sim.cfg.kkk * 2) {
-            cache_nwords -= sim.cfg.kkk * 2;
+        if (cache.cfg.cache_nwords > sim.cfg.kkk * 2) {
+            cache.cfg.cache_nwords -= sim.cfg.kkk * 2;
         } else {
             // if can't keep, use smaller kkk
             // (make kkk*2 to be half cachesize)
-            newkkk = cache_nwords / 4;
+            newkkk = cache.cfg.cache_nwords / 4;
             newttk = (sim.cfg.K + sim.cfg.kkk - 1) / sim.cfg.kkk;
-            cache_nwords -= sim.cfg.kkk * 2;
+            cache.cfg.cache_nwords -= sim.cfg.kkk * 2;
         }
         reset_cursor(&sim.cursor);
         runTile(newkkk);
@@ -530,7 +530,7 @@ int main(int argc, char *argv[])
              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         // LRU + 4 words scheme0
         // just same as using scheme0 with cacheline = 4
-        cache_nwords    = inputcachesize;
+        cache.cfg.cache_nwords    = input_cfg_cache_nwords;
         cache.cfg.scheme= CACHE_SCHEME_BASE;
         setSET(4*4);
         reset_cursor(&sim.cursor);
