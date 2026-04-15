@@ -861,14 +861,14 @@ bool cacheReadPracticalDenseLFU(long long addr) {
     if(cacheHitPracticalDenseLFU(addr)) {
         totalhit++;
         data_access_hit++;
-        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramReadBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
         return 1;
     } else {
         // dram load
-        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // sram write
-        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
-        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+        computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
+        computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         // update cache status
         cacheReplacePracticalDenseLFU(addr);
         return 0;
@@ -1194,10 +1194,10 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         }
 
         if(!allhit) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.CACHE_BLOCK_WORDS);
 
-            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_DWORDS);
+            computeB += memoryBandwidthPE(cache.cfg.CACHE_BLOCK_WORDS);
         }
     }
 }
