@@ -1284,12 +1284,12 @@ int main(int argc, char *argv[])
         cachesize               = 262144;
 
         cache.cfg = {
-            .scheme             = CACHE_SCHEME_FLFU,
-	    .CACHE_BLOCK_BYTES  = 64,
-	    .CACHE_BLOCK_DWORDS = 64 / 4,
-	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
-	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
-	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
+            .scheme                     = CACHE_SCHEME_FLFU,
+            .CACHE_BLOCK_BYTES          = 64,
+            .CACHE_BLOCK_WORDS          = 64 / 4,
+            .CACHE_BLOCK_WORDS_LOG2     = 4,
+            .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
+            .CACHE_BLOCK_BYTES_PER_COORD= coordsize
         };
         setSET();
 
@@ -1313,8 +1313,8 @@ int main(int argc, char *argv[])
         prefetchSize = inputcachesize / 6;
         cacheScheme = CACHE_SCHEME_INNER_SP;
         cachesize = inputcachesize;
-        cache.cfg.CACHE_BLOCK_DWORDS = 16;
-        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 4;
+        cache.cfg.CACHE_BLOCK_WORDS = 16;
+        cache.cfg.CACHE_BLOCK_WORDS_LOG2 = 4;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
@@ -1327,8 +1327,8 @@ int main(int argc, char *argv[])
         cacheScheme = CACHE_SCHEME_SPARCH;
         prefetchSize = inputcachesize / 6;
         cachesize = inputcachesize - prefetchSize;
-        cache.cfg.CACHE_BLOCK_DWORDS = 144;
-        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 8;
+        cache.cfg.CACHE_BLOCK_WORDS = 144;
+        cache.cfg.CACHE_BLOCK_WORDS_LOG2 = 8;
         setSET();
         // calculate metadata overhead.
         // if metadata overflow, choose smaller tile
@@ -1355,8 +1355,8 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cacheScheme = CACHE_SCHEME_BASE;
         cachesize = inputcachesize;
-        cache.cfg.CACHE_BLOCK_DWORDS = 4;
-        cache.cfg.CACHE_BLOCK_DWORDS_LOG2 = 2;
+        cache.cfg.CACHE_BLOCK_WORDS = 4;
+        cache.cfg.CACHE_BLOCK_WORDS_LOG2 = 2;
         setSET();
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);
@@ -1380,8 +1380,8 @@ int main(int argc, char *argv[])
         cache.cfg = {
             .scheme             = CACHE_SCHEME_FLFU,
 	    .CACHE_BLOCK_BYTES  = 64,
-	    .CACHE_BLOCK_DWORDS = 64 / 4,
-	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
+	    .CACHE_BLOCK_WORDS = 64 / 4,
+	    .CACHE_BLOCK_WORDS_LOG2 = 4,
 	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
 	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
         };

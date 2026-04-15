@@ -32,8 +32,8 @@ struct cache_config {
     enum cache_scheme scheme;
 
     u64 CACHE_BLOCK_BYTES;
-    u64 CACHE_BLOCK_DWORDS;
-    u64 CACHE_BLOCK_DWORDS_LOG2;
+    u64 CACHE_BLOCK_WORDS;
+    u64 CACHE_BLOCK_WORDS_LOG2;
     u64 CACHE_BLOCK_BYTES_PER_ELEM;  // one doubleword by default
     u64 CACHE_BLOCK_BYTES_PER_COORD;
 };
