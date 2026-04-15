@@ -478,7 +478,7 @@ int main(int argc, char *argv[])
 
         ISCACHE = 1;
         cache.cfg.cache_nwords        = input_cfg_cache_nwords;
-        cache.cfg.scheme    = CACHE_SCHEME_FLFU;
+        cache.cfg.scheme    = CACHE_SCHEME_FLFU_DENSE;
         setSET(16*4);
         adaptive_prefetch   = 1;
         useVirtualTag       = 1;

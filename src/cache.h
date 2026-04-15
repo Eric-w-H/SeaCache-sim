@@ -32,6 +32,7 @@ struct cache_config {
     u32 cache_nwords;
 
     u32 block_nbytes;
+    u32 block_nbytes_log2;
     u32 block_nwords;
     u32 block_nwords_log2;
     u32 block_nelems;
