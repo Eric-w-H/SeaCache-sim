@@ -975,9 +975,9 @@ int main(int argc, char *argv[])
         +   "GBs_" + std::to_string(tmpPE)
         +   "PEs_" + std::to_string(tmpbank) + "sbanks_"
         +   "_" + matrix1_name + "_" + matrix2_name + "_"
-        +   printFormat[format] + "_" + (transpose ? "1" : "0") 
-	+   "_dense_" + dense_matrices
-	+ ".txt";
+        +   printFormat[0] + "_" + (transpose ? "1" : "0") 
+        +   "_dense_" + dense_matrices
+        + ".txt";
 
     FILE *matrix1_file  = fopen(matrix1_filepath.c_str(), "r");
     FILE *matrix2_file  = fopen(matrix2_filepath.c_str(), "r");
@@ -1285,11 +1285,11 @@ int main(int argc, char *argv[])
 
         cache.cfg = {
             .scheme             = CACHE_SCHEME_FLFU,
-	    .CACHE_BLOCK_BYTES  = 64,
-	    .CACHE_BLOCK_DWORDS = 64 / 4,
-	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
-	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
-	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
+            .CACHE_BLOCK_BYTES  = 64,
+            .CACHE_BLOCK_DWORDS = 64 / 4,
+            .CACHE_BLOCK_DWORDS_LOG2 = 4,
+            .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
+            .CACHE_BLOCK_BYTES_PER_COORD = coordsize
         };
         setSET();
 
@@ -1378,22 +1378,20 @@ int main(int argc, char *argv[])
         ISCACHE = 1;
         cachesize               = 262144;
         cache.cfg = {
-            .scheme             = CACHE_SCHEME_FLFU,
-	    .CACHE_BLOCK_BYTES  = 64,
-	    .CACHE_BLOCK_DWORDS = 64 / 4,
-	    .CACHE_BLOCK_DWORDS_LOG2 = 4,
-	    .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
-	    .CACHE_BLOCK_BYTES_PER_COORD = coordsize
+            .scheme             = CACHE_SCHEME_FLFU_DENSE,
+            .CACHE_BLOCK_BYTES  = 64,
+            .CACHE_BLOCK_DWORDS = 64 / 4,
+            .CACHE_BLOCK_DWORDS_LOG2 = 4,
+            .CACHE_BLOCK_BYTES_PER_ELEM = elemsize,
+            .CACHE_BLOCK_BYTES_PER_COORD = coordsize
         };
         setSET();
 
         adaptive_prefetch = 1;
-        cacheScheme = CACHE_SCHEME_FLFU;
+        cacheScheme = CACHE_SCHEME_FLFU_DENSE;
         cachesize = inputcachesize;
 
-        // adaptive sparse-dense scheme, also uses virtual tag in sparse mode. Overloading this
-        // a little but it's ok.
-        useVirtualTag = 2;
+        useVirtualTag = 1;
 
         reset_cursor(&sim.cursor);
         runTile(sim.cfg.kkk);

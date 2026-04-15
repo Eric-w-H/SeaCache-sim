@@ -71,6 +71,7 @@ struct tile {
         // - will equal pair of _tile_dim's
         // - assert(A.major_dim == B.minor_dim)
     const Coord **map, *offsets;// compressed sparse major -> minor map (e.g. CSR/CSC)
+    // B.map[jj][ y for y < sizes[jj] ] -> yth index in minor dim of b (kk)
 
     // mutables
     const b16   *minor_wrap;

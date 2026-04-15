@@ -335,9 +335,9 @@ def main(argv: Sequence[str]) -> int:
     matrix_roots = [
         repo_root / "data",
         repo_root / "largedata",
-        repo_root / "dense",
         repo_root / "bfs",
     ]
+    dense_matrix_roots = [repo_root / "dense"]
 
     if args.matrices.strip():
         matrices = [m.strip() for m in args.matrices.split(",") if m.strip()]

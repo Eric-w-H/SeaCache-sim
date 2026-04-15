@@ -24,7 +24,8 @@ enum cache_scheme {
     CACHE_SCHEME_MAPPING,        // formerly magic 1
     CACHE_SCHEME_FLFU,           // formerly magic 88
     CACHE_SCHEME_INNER_SP,       // formerly magic 11100
-    CACHE_SCHEME_SPARCH          // formerly magic 11101
+    CACHE_SCHEME_SPARCH,         // formerly magic 11101
+    CACHE_SCHEME_FLFU_DENSE,     // NEW for EECS570
 };
 
 

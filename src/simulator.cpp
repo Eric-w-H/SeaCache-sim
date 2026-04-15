@@ -763,7 +763,7 @@ void get_B_fibers(int ii)
             // In cache Mode
             // address in cache mode is : fiberid + (relative << bias)  where relative =
             // (relative coordinate in fiber)/CACHEBLOCK
-            int fibersize = bsize * 3 + 1;
+            int fibersize = bsize * (cache.cfg.CACHE_BLOCK_BYTES_PER_ELEM + cache.cfg.CACHE_BLOCK_BYTES_PER_COORD);
             cacheAccessFiber(jj, fibersize, ii);
         }
         // << get_B_fiber inlined
@@ -900,7 +900,7 @@ bool prefetchrow(int ii) {
     }
     // FLFU mode; don't need next pointer (*3)
     // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
-    else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU) {
+    else if (cacheScheme == 66 || cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_FLFU_DENSE) {
         needsize = sim.cursor.A.sizes[ii - TI] * 3;
     }
 
@@ -940,7 +940,7 @@ bool prefetchrow(int ii) {
         }
 
         // practical flfu. update in the flubit
-        if (cacheScheme == CACHE_SCHEME_FLFU) {
+        if (cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_FLFU_DENSE) {
 
             long long firstaddr = getCacheAddr(jj, 0);
             int fibersize = sim.cursor.B.sizes[jj - TJ] * (cache.cfg.CACHE_BLOCK_BYTES_PER_ELEM + cache.cfg.CACHE_BLOCK_BYTES_PER_COORD);
@@ -965,6 +965,7 @@ bool prefetchrow(int ii) {
                                 continue;
                             }
                         } else {
+                            // something else was split into the cache (we should check Cnt here, but this is ok because we don't actually store the encoding)
                             if (PosOrig[_set * SETASSOC + i] != 0) {
                                 continue;
                             }
@@ -1399,8 +1400,9 @@ static void calculate_sparse() {
         prefetchNow = 0;
 
         // all prefetch scheme
-        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-            cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
+        if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66
+         || cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH
+         || cacheScheme == CACHE_SCHEME_FLFU_DENSE) {
             // reinitialize the next pointer for FLRU
             if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == CACHE_SCHEME_INNER_SP ||
                 cacheScheme == CACHE_SCHEME_SPARCH) {
@@ -1443,8 +1445,9 @@ static void calculate_sparse() {
 
             // update the prefetch window after each row
             // don't need to update prefetch window in static flru
-            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66 ||
-                cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
+            if (cacheScheme == 6 || cacheScheme == 7 || cacheScheme == 66
+             || cacheScheme == CACHE_SCHEME_FLFU || cacheScheme == CACHE_SCHEME_FLFU_DENSE 
+             || cacheScheme == CACHE_SCHEME_INNER_SP || cacheScheme == CACHE_SCHEME_SPARCH) {
 
                 // first minus this row's overhead
                 int needsize = 0;
