@@ -236,7 +236,7 @@ bool cacheHitPracticalDenseLFU(long long addr) {
     int _tag = getTag2(addr);
 
     for (int i = 0; i < SETASSOC; i++) {
-        if (Valid[_set * SETASSOC + i] && Dense[_set * SETASSOC + i] && Tag[_set * SETASSOC + i]) {
+        if (Valid[_set * SETASSOC + i] && Dense[_set * SETASSOC + i] && Tag[_set * SETASSOC + i] == _tag) {
             // hit!
             updateLFUHit(_set, i);
             return 1;
