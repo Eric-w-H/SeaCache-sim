@@ -137,7 +137,7 @@ def write_dense_matrices(valid_matrices, dense_matrix_root, matrix_roots):
         with open(dense_matrix_root / ("dense_" + matrix + ".mtx"), 'w') as f:
             f.write(f"{dense_rows} {spm.shape[1]} {dense_rows * spm.shape[1]}")
         with open("tiles/dense_" + matrix, 'w') as f:
-            f.write(f"{dense_rows} {spm.shape[1]} {spm.shape[1]}")
+            f.write(f"{32} {32} {32}")
 
 
 def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
