@@ -699,7 +699,7 @@ bool cacheReadPracticalLFU(long long addr, bool isfirst, long long firstaddr) {
 static inline
 u64 get_addr_flfu_dense(Coord jj, Coord kk)
 {
-    return ((jj * sim.cursor.B.major_dim) + kk) * sim.cfg.elem_nbytes;
+    return ((jj * sim.cfg.K) + kk) * sim.cfg.elem_data_nbytes;
 }
 
 // FIXME: cache.cfg.block_nbytes is not necessarily a power of 2, and getlog is floor(log2)
@@ -1121,7 +1121,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
         const u32 ndense_elems_per_line = cache.cfg.block_nbytes / sim.cfg.elem_data_nbytes;
         b8 anymiss          = 0;
-        const Coord *fiber_ks= sim.cursor.B.map[jj - TJ];
+        const Coord *fiber_ks= sim.cursor.B.map[jj - TJ] + sim.cursor.B.begins[jj - TJ];
         Coord fiber_nelems  = sim.cursor.B.sizes[jj - TJ];
         Coord e             = 0;
         Coord lines_consumed= 0;
