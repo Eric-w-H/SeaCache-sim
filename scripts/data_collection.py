@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import concurrent.futures
+from scipy.io import mmread
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -128,6 +129,15 @@ def validate_inputs(
             valid_matrices.append(matrix)
 
     return valid_matrices, problems
+
+def write_dense_matrices(valid_matrices, dense_matrix_root, matrix_roots):
+    for matrix in valid_matrices:
+        spm = mmread(matrix_file_path(matrix, matrix_roots))
+        dense_rows = max(10, 1_000_000 // spm.shape[1])
+        with open(dense_matrix_root / ("dense_" + matrix + ".mtx"), 'w') as f:
+            f.write(f"{dense_rows} {spm.shape[1]} {dense_rows * spm.shape[1]}")
+        with open("tiles/dense_" + matrix, 'w') as f:
+            f.write(f"{dense_rows} {spm.shape[1]} {spm.shape[1]}")
 
 
 def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
@@ -254,7 +264,10 @@ def run_one(
     timeout_s: int,
     dry_run: bool,
 ) -> Tuple[str, int, Optional[Path], str]:
-    cmd = [str(scache_path), matrix, matrix, str(cfg_path)]
+    cmd = [ str(scache_path)
+          , "dense_" + matrix if cfg.denseA else matrix
+          , "dense_" + matrix if cfg.denseB else matrix
+          , str(cfg_path)]
 
     if dry_run:
         return ("dry_run", 0, None, " ".join(cmd))
@@ -337,7 +350,7 @@ def main(argv: Sequence[str]) -> int:
         repo_root / "largedata",
         repo_root / "bfs",
     ]
-    dense_matrix_roots = [repo_root / "dense"]
+    dense_matrix_root = repo_root / "dense"
 
     if args.matrices.strip():
         matrices = [m.strip() for m in args.matrices.split(",") if m.strip()]
@@ -372,6 +385,9 @@ def main(argv: Sequence[str]) -> int:
     if not valid_matrices:
         print("No valid matrices found. Exiting.")
         return 1
+
+    if ('dense' in args.profile or 'full' in args.profile):
+        write_dense_matrices(valid_matrices, dense_matrix_root, matrix_roots)
 
     configs = build_experiment_grid(args)
     cfg_map = write_config_files(
