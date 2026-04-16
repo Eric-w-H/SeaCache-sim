@@ -6,8 +6,9 @@ ELEM_DATA_NBYTES    = 8
 ELEM_COORD_NBYTES   = 4 # assume each dimension is at most 2^32 (~4 billion) elements long
 
 filepath    = sys.argv[1]
+col_major   = '--col-major' in sys.argv
 header_seen = False
-col_dim     = None
+row_dim = col_dim = None
 rows, cols  = [], []
 
 with open(filepath) as f:
@@ -16,13 +17,18 @@ with open(filepath) as f:
             continue
         if not header_seen:
             header_seen = True
-            col_dim = int(line.split()[1])
+            parts = line.split()
+            row_dim, col_dim = int(parts[0]), int(parts[1])
             continue
         parts = line.split()
         rows.append(int(parts[0]))
         cols.append(int(parts[1]))
 
-cl = (np.array(rows) * col_dim + np.array(cols)) * ELEM_DATA_NBYTES // LINE_NBYTES
+rows, cols = np.array(rows), np.array(cols)
+if col_major:
+    cl = (cols * row_dim + rows) * ELEM_DATA_NBYTES // LINE_NBYTES
+else:
+    cl = (rows * col_dim + cols) * ELEM_DATA_NBYTES // LINE_NBYTES
 _, counts   = np.unique(cl, return_counts=True)
 occ, freq   = np.unique(counts, return_counts=True)
 total_lines = np.sum(freq) # nonempty lines only
@@ -36,4 +42,4 @@ for o, f in zip(occ, freq):
     print(f"occupancy {o}: {f/total_lines*100:6.2f}% ({f} lines)")
 
 dense_lines = np.sum(freq[occ > breakeven])
-print(f"\nLines above break-even: {dense_lines}/{total_lines} ({dense_lines/total_lines*100:.2f}%)")
+print(f"Lines above break-even: {dense_lines}/{total_lines} ({dense_lines/total_lines*100:.2f}%)")
