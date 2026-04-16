@@ -27,7 +27,7 @@ void setSET(u32 block_nbytes)
 }
 
 b8 *Valid = nullptr;
-i32 *Tag = nullptr;
+i64 *Tag = nullptr;
 i32 *lrubit = nullptr;
 i32 *lfubit = nullptr;
 b8 *Dense = NULL;
@@ -704,14 +704,14 @@ u64 get_addr_flfu_dense(Coord jj, Coord kk)
 
 // FIXME: cache.cfg.block_nbytes is not necessarily a power of 2, and getlog is floor(log2)
 static inline
-u32 get_set_flfu_dense(u64 addr)
+u64 get_set_flfu_dense(u64 addr)
 {
     return (addr >> cache.cfg.block_nbytes_log2) % cache.cfg.nsets;
 }
 
 // FIXME: there may be aliasing with sparse (but dense prevents collision)? overflow u32 size?
 static inline
-u32 get_tag_flfu_dense(u64 addr)
+u64 get_tag_flfu_dense(u64 addr)
 {
     return (addr >> cache.cfg.block_nbytes_log2) / cache.cfg.nsets;
 }
@@ -1180,7 +1180,7 @@ void initialize_cache()
     if (need_realloc) {
         arena_clear(cache.backing);
         Valid          = (b8  *)arena_push(cache.backing, nblocks         * sizeof(*Valid),          __alignof__(*Valid),          1);
-        Tag            = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*Tag),            __alignof__(*Tag),            0);
+        Tag            = (i64 *)arena_push(cache.backing, nblocks         * sizeof(*Tag),            __alignof__(*Tag),            0);
         Dense          = (b8  *)arena_push(cache.backing, nblocks         * sizeof(*Dense),          __alignof__(*Dense),          0);
         lrubit         = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*lrubit),         __alignof__(*lrubit),         0);
         lfubit         = (i32 *)arena_push(cache.backing, nblocks         * sizeof(*lfubit),         __alignof__(*lfubit),         0);

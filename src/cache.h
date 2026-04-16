@@ -68,7 +68,7 @@ extern int LFUmax;
 extern int *LFUtag;
 
 extern b8 *Valid;
-extern i32 *Tag;
+extern i64 *Tag;
 extern i32 *lrubit;
 extern i32 *lfubit;
 extern b8 *Dense;
