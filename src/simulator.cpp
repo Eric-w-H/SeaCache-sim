@@ -900,7 +900,7 @@ bool prefetchrow(int ii) {
     }
     // FLFU mode; don't need next pointer (*3)
     // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
-    else if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU) {
+    else if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
         needsize = sim.cursor.A.sizes[ii - TI] * 3;
     }
 
@@ -939,7 +939,7 @@ bool prefetchrow(int ii) {
         }
 
         // practical flfu. update in the flubit
-        if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
+        if (cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
 
             long long firstaddr = getCacheAddr(jj, 0);
             int fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
@@ -1255,7 +1255,7 @@ void calculate() {
 
         // all prefetch scheme
         if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == 66 ||
-            cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
+            cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
             // reinitialize the next pointer for FLRU
             if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == CACHE_SCHEME_INNER_SP ||
                 cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
@@ -1299,7 +1299,7 @@ void calculate() {
             // update the prefetch window after each row
             // don't need to update prefetch window in static flru
             if (cache.cfg.scheme == 6 || cache.cfg.scheme == 7 || cache.cfg.scheme == 66 ||
-                cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
+                cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE || cache.cfg.scheme == CACHE_SCHEME_INNER_SP || cache.cfg.scheme == CACHE_SCHEME_SPARCH) {
 
                 // first minus this row's overhead
                 int needsize = 0;
@@ -1307,7 +1307,7 @@ void calculate() {
                     needsize = sim.cursor.A.sizes[TI + ii] * 4 + 1;
                 }
                 // FLFU mode; don't need next pointer (*3)
-                if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU) {
+                if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
                     needsize = sim.cursor.A.sizes[TI + ii] * 3;
                 }
 
@@ -1686,7 +1686,7 @@ void runTile(int kkk)
         setSET(cache.cfg.block_nbytes);
     }
 
-    if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
+    if (cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
 
         cache.cfg.cache_nwords = input_cfg_cache_nwords - prefetchSize;
 

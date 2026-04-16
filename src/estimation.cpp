@@ -19,7 +19,7 @@ void getParameter()
     b8  *seen;
     Coord *dirty;
     seen = (b8 *)arena_push(global_temp, sim.cfg.K*sizeof(*seen), __alignof__(*seen), 1);
-    dirty= (Coord*)arena_push(global_temp, sim.cfg.K*sizeof(*dirty), __alignof__(*dirty), 0);
+    dirty= (Coord*)arena_push(global_temp, sim.cfg.K*sizeof(*dirty), __alignof__(*dirty), 1);
 
     estEffMAC   = 0;
     u64 estnnzC = 0;

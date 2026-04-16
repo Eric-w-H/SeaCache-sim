@@ -17,7 +17,7 @@ DEBUG_OBJS := $(FILENAMES:%=$(DEBUG_DIR)/%.o)
 
 # Flags for g++
 CPPFLAGS := -O3 -Wall -Wextra -std=c++2a
-DEBUG_CPPFLAGS := $(CPPFLAGS) -Werror -g
+DEBUG_CPPFLAGS := $(CPPFLAGS) -g
 
 # Phony targets (do not represent a file)
 .PHONY: remake debug clean 

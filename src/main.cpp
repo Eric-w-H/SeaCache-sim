@@ -478,7 +478,7 @@ int main(int argc, char *argv[])
 
         ISCACHE = 1;
         cache.cfg.cache_nwords        = input_cfg_cache_nwords;
-        cache.cfg.scheme    = CACHE_SCHEME_FLFU_DENSE;
+        cache.cfg.scheme    = CACHE_SCHEME_FLFU;
         setSET(16*4);
         adaptive_prefetch   = 1;
         useVirtualTag       = 1;
@@ -551,16 +551,20 @@ int main(int argc, char *argv[])
     if (!baselinetest) {
         puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
 
-        /*****************************************
-        adaptive_prefetch = 1;
-        useVirtualTag = 2;
-        cache.cfg.scheme;
-        cachesize = inputcachesize;
+        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
+            matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+            matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
+        );
 
-        runTile(kkk);
-        adaptive_prefetch = 0;
-        useVirtualTag = 0;
-        *****************************************/
+        ISCACHE = 1;
+        cache.cfg.cache_nwords        = input_cfg_cache_nwords;
+        cache.cfg.scheme    = CACHE_SCHEME_FLFU_DENSE;
+        setSET(16*4);
+        adaptive_prefetch   = 1;
+        useVirtualTag       = 1;
+
+        reset_cursor(&sim.cursor);
+        runTile(sim.cfg.kkk);
     }
 
     return 0;
