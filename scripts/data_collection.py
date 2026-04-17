@@ -17,6 +17,8 @@ import json
 import re
 import subprocess
 import sys
+import concurrent
+from tqdm import tqdm
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -63,15 +65,15 @@ class ExperimentConfig:
             "condensedOP": self.condensedop,
             "tileDir": tile_dir,
             "outputDir": output_dir,
-            "elemDataBytes": data_bytes,
-            "coordDataBytes": coord_bytes,
+            "elemDataBytes": self.data_bytes,
+            "coordDataBytes": self.coord_bytes,
         }
 
     def tag(self) -> str:
         condensed = 1 if self.condensedop else 0
         return (
             f"t{self.transpose}_c{self.cachesize:g}_bw{self.memorybandwidth:g}"
-            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}_{data_bytes}_{coord_bytes}"
+            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}_{self.data_bytes}_{self.coord_bytes}"
         )
 
 
@@ -156,8 +158,8 @@ def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
 
     if args.profile == "full":
         configs = [
-            ExperimentConfig(t, c, bw, pe, sb, b, co)
-            for t, c, bw, pe, sb, b, co in itertools.product(
+            ExperimentConfig(t, c, bw, pe, sb, b, co, ds, cs)
+            for t, c, bw, pe, sb, b, co, ds, cs in itertools.product(
                 parse_csv_numbers(args.transpose_values, int),
                 parse_csv_numbers(args.cachesize_values, float),
                 parse_csv_numbers(args.bandwidth_values, float),
@@ -284,7 +286,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--bandwidth-values", default="34,68,136")
     p.add_argument("--pecnt-values", default="16,32,64")
     p.add_argument("--srambank-values", default="16,32,64")
-    p.add_argument("--baseline-values", default="0")
+    p.add_argument("--baseline-values", default="0,1")
     p.add_argument("--condensed-values", default="0")
 
     return p.parse_args(argv)
@@ -355,54 +357,59 @@ def main(argv: Sequence[str]) -> int:
     total_jobs = len(valid_matrices) * len(configs)
     done_jobs = 0
 
-    for matrix in valid_matrices:
-        mtx_path = matrix_file_path(matrix, matrix_roots)
-        assert mtx_path is not None
+    with concurrent.futures.ThreadPoolExecutor(8) as pool:
+        jobs = {}
+        for matrix in valid_matrices:
+            mtx_path = matrix_file_path(matrix, matrix_roots)
+            assert mtx_path is not None
 
-        for cfg in configs:
-            done_jobs += 1
-            cfg_path = cfg_map[cfg]
-            print(
-                f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> running"
-                if not args.dry_run
-                else f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> dry run"
-            )
+            for cfg in configs:
+                done_jobs += 1
+                cfg_path = cfg_map[cfg]
+                print(
+                    f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> registered"
+                )
 
-            status, returncode, out_path, cmd = run_one(
-                scache_path=scache_path,
-                matrix=matrix,
-                cfg=cfg,
-                cfg_path=cfg_path,
-                output_dir=output_dir,
-                timeout_s=args.timeout,
-                dry_run=args.dry_run,
-            )
+                jobs[pool.submit(run_one,
+                                    scache_path=scache_path,
+                                    matrix=matrix,
+                                    cfg=cfg,
+                                    cfg_path=cfg_path,
+                                    output_dir=output_dir,
+                                    timeout_s=args.timeout,
+                                    dry_run=args.dry_run,
+                                 )] = (matrix, cfg)
 
-            row: Dict[str, object] = {
-                "matrix": matrix,
-                "matrix_file": str(mtx_path),
-                "config_file": str(cfg_path),
-                "status": status,
-                "returncode": returncode,
-                "command": cmd,
-                "output_file": str(out_path) if out_path else "",
-                "transpose": cfg.transpose,
-                "cachesize": cfg.cachesize,
-                "memorybandwidth": cfg.memorybandwidth,
-                "PEcnt": cfg.pecnt,
-                "srambank": cfg.srambank,
-                "baselinetest": cfg.baselinetest,
-                "condensedOP": int(cfg.condensedop),
-            }
+    for future in tqdm(concurrent.futures.as_completed(jobs), total=len(jobs)):
+        status, returncode, out_path, cmd = future.result()
+        matrix, cfg = jobs[future]
+        row: Dict[str, object] = {
+            "matrix": matrix,
+            "matrix_file": str(mtx_path),
+            "config_file": str(cfg_path),
+            "status": status,
+            "returncode": returncode,
+            "command": cmd,
+            "output_file": str(out_path) if out_path else "",
+            "transpose": cfg.transpose,
+            "cachesize": cfg.cachesize,
+            "memorybandwidth": cfg.memorybandwidth,
+            "PEcnt": cfg.pecnt,
+            "srambank": cfg.srambank,
+            "baselinetest": cfg.baselinetest,
+            "data_bytes": cfg.data_bytes,
+            "coord_bytes": cfg.coord_bytes,
+            "condensedOP": int(cfg.condensedop),
+        }
 
-            if out_path and out_path.exists() and not args.dry_run:
-                text = out_path.read_text(encoding="utf-8", errors="ignore")
-                row.update(extract_metrics(text))
-            else:
-                for key in METRIC_PATTERNS:
-                    row[key] = None
+        if out_path and out_path.exists() and not args.dry_run:
+            text = out_path.read_text(encoding="utf-8", errors="ignore")
+            row.update(extract_metrics(text))
+        else:
+            for key in METRIC_PATTERNS:
+                row[key] = None
 
-            rows.append(row)
+        rows.append(row)
 
     write_csv(rows, results_csv)
     print(f"[{datetime.now().isoformat(timespec='seconds')}] Wrote {len(rows)} rows to {results_csv}")
