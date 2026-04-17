@@ -340,10 +340,10 @@ void cacheReplacePracticalLFU(long long addr, bool isfirst,
 
         int fiberid = addr >> cache.cfg.block_nwords_log2;
         int tmpblocksize = cache.cfg.block_nwords;
-        tmpblocksize -= sim.cursor.B.sizes[fiberid - TJ] * 3;
+        tmpblocksize -= sim.cursor.B.sizes[fiberid - TJ] * sim.cfg.elem_nwords;
         while (tmpblocksize > 0 && (fiberid + fibercnt < TJ + sim.cfg.jjj)) {
-            if (sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3 <= tmpblocksize) {
-                tmpblocksize -= sim.cursor.B.sizes[fiberid + fibercnt - TJ] * 3;
+            if (sim.cursor.B.sizes[fiberid + fibercnt - TJ] * sim.cfg.elem_nwords <= tmpblocksize) {
+                tmpblocksize -= sim.cursor.B.sizes[fiberid + fibercnt - TJ] * sim.cfg.elem_nwords;
                 fibercnt++;
             } else {
                 break;
@@ -918,9 +918,9 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         //     before each time the tiling size is fixed
         // 2) add the extra acecss each time acecss a line
         //      here at each single fiber access
-        int tmpaddr = offsetarrayB[jj] * 3;
+        int tmpaddr = offsetarrayB[jj] * sim.cfg.elem_nwords;
         // add the current bias of this row
-        tmpaddr += sim.cursor.B.begins[jj - TJ] * 3;
+        tmpaddr += sim.cursor.B.begins[jj - TJ] * sim.cfg.elem_nwords;
         tmpaddr += sim.cfg.J;
 
         // need to read a whole line here
@@ -1086,7 +1086,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     // kept in the LFUtag, but the extra lfubit
     if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
         bool anymiss = 0;
-        fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
+        fibersize = sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nwords;
         for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
             long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
             bool tmphit = cacheReadPracticalLFU(tmpaddr, tmpcurr == 0, getCacheAddr(jj, 0));
@@ -1104,7 +1104,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
 
     if (cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
         // bool anymiss = 0;
-        // fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
+        // fibersize = sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nwords;
         // for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
         //     long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
         //     bool tmphit = cache_read_flfu_dense(tmpaddr, tmpcurr == 0, getCacheAddr(jj, 0));

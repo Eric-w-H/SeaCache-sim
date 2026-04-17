@@ -49,6 +49,8 @@ class ExperimentConfig:
     srambank: int
     baselinetest: int
     condensedop: bool
+    data_bytes: int
+    coord_bytes: int
 
     def json_obj(self, tile_dir: str, output_dir: str) -> Dict[str, object]:
         return {
@@ -61,13 +63,15 @@ class ExperimentConfig:
             "condensedOP": self.condensedop,
             "tileDir": tile_dir,
             "outputDir": output_dir,
+            "elemDataBytes": data_bytes,
+            "coordDataBytes": coord_bytes,
         }
 
     def tag(self) -> str:
         condensed = 1 if self.condensedop else 0
         return (
             f"t{self.transpose}_c{self.cachesize:g}_bw{self.memorybandwidth:g}"
-            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}"
+            f"_pe{self.pecnt}_sb{self.srambank}_b{self.baselinetest}_co{condensed}_{data_bytes}_{coord_bytes}"
         )
 
 
@@ -125,29 +129,29 @@ def validate_inputs(
 def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
     if args.profile == "quick":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 0, False, 8, 4),
         ]
 
     if args.profile == "quick-baseline":
         return [
-            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False),
-            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False),
+            ExperimentConfig(0, 1.0, 34.0, 16, 16, 1, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 1, False, 8, 4),
+            ExperimentConfig(0, 4.0, 136.0, 64, 32, 1, False, 8, 4),
         ]
 
     if args.profile == "balanced":
         return [
-            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False),
-            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False),
+            ExperimentConfig(0, 1.0, 68.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 4.0, 68.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 34.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 136.0, 32, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 16, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 64, 32, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 16, 0, False, 8, 4),
+            ExperimentConfig(0, 2.0, 68.0, 32, 64, 0, False, 8, 4),
         ]
 
     if args.profile == "full":
@@ -161,6 +165,8 @@ def build_experiment_grid(args: argparse.Namespace) -> List[ExperimentConfig]:
                 parse_csv_numbers(args.srambank_values, int),
                 parse_csv_numbers(args.baseline_values, int),
                 [False if x == 0 else True for x in parse_csv_numbers(args.condensed_values, int)],
+                [1, 2, 4, 8],
+                [4, 8]
             )
         ]
         return configs
@@ -189,7 +195,7 @@ def expected_output_filename(matrix: str, cfg: ExperimentConfig) -> str:
     prefix = "Base_" if cfg.baselinetest else "SeaCache_"
     return (
         f"CGust{prefix}{cfg.cachesize:.6f}MB_{cfg.memorybandwidth:.6f}GBs_"
-        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}.txt"
+        f"{cfg.pecnt}PEs_{cfg.srambank}sbanks__{matrix}_{matrix}_RR_{cfg.transpose}_data_{cfg.data_bytes}_coord_{cfg.coord_bytes}.txt"
     )
 
 

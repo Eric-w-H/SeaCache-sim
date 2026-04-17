@@ -238,6 +238,8 @@ int main(int argc, char *argv[])
     bool condensedOP        = config["condensedOP"].get<bool>();
     std::string tile_dir    = config["tileDir"].get<std::string>();
     std::string output_dir  = config["outputDir"].get<std::string>();
+    u32 elem_data_nbytes    = config["elemDataBytes"].get<u32>();
+    u32 elem_coord_nbytes   = config["coordDataBytes"].get<u32>();
 
     cache.cfg.cache_nwords = tmpsram * 262144 * 0.9;
     input_cfg_cache_nwords = cache.cfg.cache_nwords;
@@ -260,7 +262,9 @@ int main(int argc, char *argv[])
         +   "GBs_" + std::to_string(tmpPE)
         +   "PEs_" + std::to_string(tmpbank) + "sbanks_"
         +   "_" + matrix1_name + "_" + matrix2_name + "_"
-        +   printFormat[format] + "_" + (transpose ? "1" : "0") + ".txt";
+        +   printFormat[format] + "_" + (transpose ? "1" : "0") 
+	+ "_data_" + std::to_string(elem_data_nbytes) 
+	+ "_coord_" + std::to_string(elem_coord_nbytes) + ".txt";
 
     FILE *matrix1_file  = fopen(matrix1_filepath.c_str(), "r");
     FILE *matrix2_file  = fopen(matrix2_filepath.c_str(), "r");
@@ -311,9 +315,11 @@ int main(int argc, char *argv[])
     }
 
     const struct config cfg = {
-        .elem_data_nbytes   = 8, // double-word (f64)
-        .elem_coord_nbytes  = 4, // word (u32)
-        .elem_nbytes        = 12,
+        .elem_data_nbytes   = elem_data_nbytes,  // default double-word (f64)
+        .elem_coord_nbytes  = elem_coord_nbytes, // default word (u32)
+        .elem_nbytes        = elem_data_nbytes + elem_coord_nbytes,
+	.elem_data_nwords   = (elem_data_nbytes + 3) / 4,                     // round up to the nearest number of words (word-aligned)
+	.elem_nwords        = (elem_data_nbytes + elem_coord_nbytes + 3) / 4, // round up to the nearest number of words (word-aligned)
 
         .dataflow   = Gust,
         .interorder = IJK,

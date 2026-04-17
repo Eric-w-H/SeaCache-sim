@@ -154,7 +154,7 @@ bool checkAndLoadReuseA() {
 
                     // overflow the buffer size
                     // need to load again in rest tiles
-                    if (Asizenow + tmpsize * 3 >= Asize) {
+                    if (Asizenow + tmpsize * sim.cfg.elem_nwords >= Asize) {
                         // outside the buffer, need reload every following tiles
                         if (!fulltagA) {
                             fulltagA = 1;
@@ -162,11 +162,11 @@ bool checkAndLoadReuseA() {
                         }
                     } else {
                         // inside the buffer, don't need to reload in following tiles
-                        Asizenow += tmpsize * 3;
-                        preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                        preA += memoryBandwidthWhole(tmpsize * 3 + 2);
-                        preSramAccess += sramWriteBandwidth(tmpsize * 3 + 2);
-                        AccessByte += tmpsize * 3 + 2;
+                        Asizenow += tmpsize * sim.cfg.elem_nwords;
+                        preDramAccess += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                        preA += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                        preSramAccess += sramWriteBandwidth(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                        AccessByte += tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
                     }
                 }
             }
@@ -260,7 +260,7 @@ void pre_load_B() {
 
                 int tmpsize = (tmpk - startk);
 
-                if (Bsizenow + tmpsize * 3 >= Bsize) {
+                if (Bsizenow + tmpsize * sim.cfg.elem_nwords >= Bsize) {
                     if (!fulltagB) {
                         fulltagB= 1;
                         fullB   = tj;
@@ -268,12 +268,12 @@ void pre_load_B() {
                     //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {
 
-                    Bsizenow += tmpsize * 3;
+                    Bsizenow += tmpsize * sim.cfg.elem_nwords;
 
-                    preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preSramAccess += sramWriteBandwidth(tmpsize * 3 + 2);
-                    AccessByte += tmpsize * 3 + 2;
+                    preDramAccess += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preB += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preSramAccess += sramWriteBandwidth(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    AccessByte += tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
                 }
             }
         }
@@ -312,7 +312,7 @@ void pre_load_B() {
 
                 int tmpsize = (tmpj - startj);
 
-                if (Bsizenow + tmpsize * 3 >= Bsize) {
+                if (Bsizenow + tmpsize * sim.cfg.elem_nwords >= Bsize) {
                     if (!fulltagB) {
                         fulltagB = 1;
                         fullB = tk;
@@ -321,16 +321,16 @@ void pre_load_B() {
                     //   sim.cursor.B.sizes[tk] = tmpsize;
                 } else {
                     //   sim.cursor.B.sizes[tk] = tmpsize;
-                    preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    AccessByte += tmpsize * 3 + 2;
+                    preDramAccess += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preB += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    AccessByte += tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
 
                     // for each element need:
                     // 1) get pos: one read (current position)
                     // 2) add to chain: 1 data write; 1/block chain index write
                     preSramAccess += sramWriteBandwidth(tmpsize);
                     preSramAccess +=
-                        sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
+                        sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * sim.cfg.elem_nwords;
                 }
             }
         }
@@ -360,7 +360,7 @@ void pre_load_B() {
 
                 int tmpsize = (tmpj - startj);
 
-                if (Bsizenow + tmpsize * 3 >= Bsize) {
+                if (Bsizenow + tmpsize * sim.cfg.elem_nwords >= Bsize) {
                     if (!fulltagB) {
                         fulltagB = 1;
                         fullB = tk;
@@ -370,12 +370,12 @@ void pre_load_B() {
                     //  sim.cursor.B.sizes[tj] = tmpsize;
                 } else {
 
-                    Bsizenow += tmpsize * 3;
+                    Bsizenow += tmpsize * sim.cfg.elem_nwords;
 
-                    preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preSramAccess += sramWriteBandwidth(tmpsize * 3 + 2);
-                    AccessByte += tmpsize * 3 + 2;
+                    preDramAccess += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preB += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preSramAccess += sramWriteBandwidth(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    AccessByte += tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
                 }
             }
         }
@@ -410,7 +410,7 @@ void pre_load_B() {
 
                 int tmpsize = (tmpk - startk);
 
-                if (Bsizenow + tmpsize * 3 >= Bsize) {
+                if (Bsizenow + tmpsize * sim.cfg.elem_nwords >= Bsize) {
                     if (!fulltagB) {
                         fulltagB = 1;
                         fullB = tj;
@@ -419,16 +419,16 @@ void pre_load_B() {
                     //   sim.cursor.B.sizes[tk] = tmpsize;
                 } else {
                     //   sim.cursor.B.sizes[tk] = tmpsize;
-                    preDramAccess += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    preB += memoryBandwidthWhole(tmpsize * 3 + 2);
-                    AccessByte += tmpsize * 3 + 2;
+                    preDramAccess += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    preB += memoryBandwidthWhole(tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords);
+                    AccessByte += tmpsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
 
                     // for each element need:
                     // 1) get pos: one read (current position)
                     // 2) add to chain: 1 data write; 1/block chain index write
                     preSramAccess += sramWriteBandwidth(tmpsize);
                     preSramAccess +=
-                        sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * 3;
+                        sramReadBandwidth(tmpsize + tmpsize / fiberletlength) * sim.cfg.elem_nwords;
                 }
             }
         }
@@ -513,7 +513,7 @@ void get_B_fiber(int jj, int ii)
     if (!ISCACHE) {
 
         // two decisions: 1) consistent or not; 2) buffer or not (may bypass)
-        u64 cost = sim.cursor.B.sizes[jj - TJ] * 3 + 2;
+        u64 cost = sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
 
         if (consistent_B()) {
             // B[jj] is on the buffer
@@ -533,7 +533,7 @@ void get_B_fiber(int jj, int ii)
         } else {
             // hit part (chained)
             computeSramAccess +=
-                sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[jj] + 3) / 4);
+                sramReadBandwidth(fiberletlength * sim.cfg.elem_nwords) * ((bufferedsizeB[jj] + 3) / 4);
 
             // miss part (need to check every uncached)
 
@@ -551,7 +551,7 @@ void get_B_fiber(int jj, int ii)
     // address in cache mode is : fiberid + (relative << bias)  where relative =
     // (relative coordinate in fiber)/CACHEBLOCK
     else {
-        int fibersize = sim.cursor.B.sizes[jj - TJ] * 3 + 1;
+        int fibersize = sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nwords + 1;
         cacheAccessFiber(jj, fibersize, ii);
     }
 }
@@ -559,7 +559,7 @@ void get_B_fiber(int jj, int ii)
 // in IP
 void get_B_fiber_col_iii(int kk, int iii)
 {
-    u64 cost = sim.cursor.B.sizes[kk - TK] * 3 + 2;
+    u64 cost = sim.cursor.B.sizes[kk - TK] * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
     // B[jj] is on the buffer
     if (fulltagB == 0 || kk < fullB) {
         // hit!
@@ -580,7 +580,7 @@ void get_B_fiber_col_iii(int kk, int iii)
 void get_A_fiber_col(int jj)
 {
     assert(consistent_A());
-    u64 cost = sim.cursor.A.sizes[jj - TJ] * 3 + 2;
+    u64 cost = sim.cursor.A.sizes[jj - TJ] * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
 
     // A[ii] is on the buffer
     if (fulltagA == 0 || jj < fullA) {
@@ -604,7 +604,7 @@ void get_A_fiber_col(int jj)
 
 void get_A_fiber(int ii) {
     assert(consistent_A());
-    u64 cost = sim.cursor.A.sizes[ii - TI] * 3 + 2;
+    u64 cost = sim.cursor.A.sizes[ii - TI] * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
 
     // A[ii] is on the buffer
     if (fulltagA == 0 || ii < fullA) {
@@ -665,16 +665,16 @@ void updateCAccess(int ii)
             // *2 because
             // 1 is to write to dram
             // 1 is to read from dram at the final merge stage
-            computeDramAccess += memoryBandwidthPE(Csizenow * 3);
-            postDramAccess += memoryBandwidthPE(Csizenow * 3);
+            computeDramAccess += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
+            postDramAccess += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
             // write C at compute stage; read C at post merge stage
-            computeC += memoryBandwidthPE(Csizenow * 3);
-            postC += memoryBandwidthPE(Csizenow * 3);
-            AccessByte += Csizenow * 3;
-            AccessByte += Csizenow * 3;
+            computeC += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
+            postC += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
+            AccessByte += Csizenow * sim.cfg.elem_nwords;
+            AccessByte += Csizenow * sim.cfg.elem_nwords;
 
             computeSramAccess +=
-                sramReadBandwidth(Csizenow * 3) + sramWriteBandwidth(Csizenow * 3);
+                sramReadBandwidth(Csizenow * sim.cfg.elem_nwords) + sramWriteBandwidth(Csizenow * sim.cfg.elem_nwords);
 
             Csizenow = 0;
 
@@ -693,20 +693,20 @@ void updateCAccess(int ii)
             }
         }
         // write into DRAM during the computation
-        computeDramAccess += memoryBandwidthPE(cntc * 3);
-        computeC += memoryBandwidthPE(cntc * 3);
-        AccessByte += cntc * 3;
+        computeDramAccess += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+        computeC += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+        AccessByte += cntc * sim.cfg.elem_nwords;
 
         if (sim.cfg.jjj != sim.cfg.J) {
             // multiply 2 here if kkk != K
             // because need a extra inter-tile C merge and thus need an extra load
-            postDramAccess += memoryBandwidthPE(cntc * 3);
-            postC += memoryBandwidthPE(cntc * 3);
-            AccessByte += cntc * 3;
+            postDramAccess += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+            postC += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+            AccessByte += cntc * sim.cfg.elem_nwords;
         }
 
         computeSramAccess +=
-            sramReadBandwidth(cntc * 3) + sramWriteBandwidth(cntc * 3);
+            sramReadBandwidth(cntc * sim.cfg.elem_nwords) + sramWriteBandwidth(cntc * sim.cfg.elem_nwords);
     }
 }
 
@@ -730,7 +730,7 @@ void get_B_fibers(int ii)
             // two decisions: 1) consistent or not; 2) buffer or not (may bypass)
 
             if (consistent_B()) {
-                i64 cost = bsize * 3 + 2;
+                i64 cost = bsize * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords;
                 // B[jj] is on the buffer
                 if (fulltagB == 0 || jj < fullB) {
                     // hit!
@@ -748,7 +748,7 @@ void get_B_fibers(int ii)
                 }
             } else {
                 // hit part (chained)
-                computeSramAccess += sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[jj] + 3) / 4);
+                computeSramAccess += sramReadBandwidth(fiberletlength * sim.cfg.elem_nwords) * ((bufferedsizeB[jj] + 3) / 4);
 
                 // miss part (need to check every uncached)
 
@@ -763,7 +763,7 @@ void get_B_fibers(int ii)
             // In cache Mode
             // address in cache mode is : fiberid + (relative << bias)  where relative =
             // (relative coordinate in fiber)/CACHEBLOCK
-            int fibersize = bsize * 3 + 1;
+            int fibersize = bsize * sim.cfg.elem_nwords + 1;
             cacheAccessFiber(jj, fibersize, ii);
         }
         // << get_B_fiber inlined
@@ -787,7 +787,7 @@ void get_B_fibers(int ii)
 
     // update A access
     if (consistent_A()) {
-        i64 cost = (tmpj - sim.cursor.A.begins[ii - TI]) * 3;
+        i64 cost = (tmpj - sim.cursor.A.begins[ii - TI]) * sim.cfg.elem_nwords;
         b32 hitA = (interorder == IJK || interorder == JIK) && (fulltagA == 0 || ii < fullA);
 
         // A[ii] is on the buffer
@@ -814,7 +814,7 @@ void get_B_fibers(int ii)
 
     } else {
         // hit part (chained)
-        computeSramAccess   += sramReadBandwidth(fiberletlength * 3) * ((bufferedsizeB[ii] + 3) / 4);
+        computeSramAccess   += sramReadBandwidth(fiberletlength * sim.cfg.elem_nwords) * ((bufferedsizeB[ii] + 3) / 4);
 
         // miss part (need to check every uncached)
         if (fulltagA) {
@@ -845,13 +845,13 @@ void get_B_fibers(int ii)
             // *2 because
             // 1 is to write to dram
             // 1 is to read from dram at the final merge stage
-            computeDramAccess   += memoryBandwidthPE(Csizenow * 3);
-            postDramAccess      += memoryBandwidthPE(Csizenow * 3);
+            computeDramAccess   += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
+            postDramAccess      += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
             // write C at compute stage; read C at post merge stage
-            computeC            += memoryBandwidthPE(Csizenow * 3);
-            postC               += memoryBandwidthPE(Csizenow * 3);
+            computeC            += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
+            postC               += memoryBandwidthPE(Csizenow * sim.cfg.elem_nwords);
             AccessByte          += Csizenow * 6;
-            computeSramAccess   += sramReadBandwidth(Csizenow * 3) + sramWriteBandwidth(Csizenow * 3);
+            computeSramAccess   += sramReadBandwidth(Csizenow * sim.cfg.elem_nwords) + sramWriteBandwidth(Csizenow * sim.cfg.elem_nwords);
             Csizenow = 0;
 
             for (int i = TI; i < TI + sim.cfg.iii; i++) {
@@ -863,20 +863,20 @@ void get_B_fibers(int ii)
         // update with compute
 
         // write into DRAM during the computation
-        computeDramAccess += memoryBandwidthPE(ndirty * 3);
-        computeC += memoryBandwidthPE(ndirty * 3);
-        AccessByte += ndirty * 3;
+        computeDramAccess += memoryBandwidthPE(ndirty * sim.cfg.elem_nwords);
+        computeC += memoryBandwidthPE(ndirty * sim.cfg.elem_nwords);
+        AccessByte += ndirty * sim.cfg.elem_nwords;
 
         if (sim.cfg.jjj != sim.cfg.J) {
             // multiply 2 here if kkk != K
             // because need a extra inter-tile C merge and thus need an extra load
-            postDramAccess += memoryBandwidthPE(ndirty * 3);
-            postC += memoryBandwidthPE(ndirty * 3);
-            AccessByte += ndirty * 3;
+            postDramAccess += memoryBandwidthPE(ndirty * sim.cfg.elem_nwords);
+            postC += memoryBandwidthPE(ndirty * sim.cfg.elem_nwords);
+            AccessByte += ndirty * sim.cfg.elem_nwords;
         }
 
         computeSramAccess +=
-            sramReadBandwidth(ndirty * 3) + sramWriteBandwidth(ndirty * 3);
+            sramReadBandwidth(ndirty * sim.cfg.elem_nwords) + sramWriteBandwidth(ndirty * sim.cfg.elem_nwords);
     }
     // << updateCaccess() inlined
 
@@ -901,7 +901,7 @@ bool prefetchrow(int ii) {
     // FLFU mode; don't need next pointer (*3)
     // NOTE(ejs): 2 data (words) + 1 coord (word) = 3 words
     else if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
-        needsize = sim.cursor.A.sizes[ii - TI] * 3;
+        needsize = sim.cursor.A.sizes[ii - TI] * sim.cfg.elem_nwords;
     }
 
     // can't prefetch this row now
@@ -942,7 +942,7 @@ bool prefetchrow(int ii) {
         if (cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
 
             long long firstaddr = getCacheAddr(jj, 0);
-            int fibersize = sim.cursor.B.sizes[jj - TJ] * 3;
+            int fibersize = sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nwords;
             for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
                 long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
 
@@ -1308,7 +1308,7 @@ void calculate() {
                 }
                 // FLFU mode; don't need next pointer (*3)
                 if (cache.cfg.scheme == 66 || cache.cfg.scheme == CACHE_SCHEME_FLFU || cache.cfg.scheme == CACHE_SCHEME_FLFU_DENSE) {
-                    needsize = sim.cursor.A.sizes[TI + ii] * 3;
+                    needsize = sim.cursor.A.sizes[TI + ii] * sim.cfg.elem_nwords;
                 }
 
                 if (prefetchNow > needsize) {
@@ -1415,19 +1415,19 @@ void calculate() {
             }
 
             if (!fulltagC) {
-                if (Csizenow + cntc * 3 >= Csize) {
+                if (Csizenow + cntc * sim.cfg.elem_nwords >= Csize) {
                     fulltagC = 1;
-                    Csizenow += cntc * 3;
+                    Csizenow += cntc * sim.cfg.elem_nwords;
                 } else {
-                    Csizenow += cntc * 3;
+                    Csizenow += cntc * sim.cfg.elem_nwords;
                     // can be stored in sram!
                     computeSramAccess +=
-                        sramReadBandwidth(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
+                        sramReadBandwidth(cntc * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords) * (sim.cfg.jjj / mergecnt);
                 }
             } else {
-                computeDramAccess += memoryBandwidthPE(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
-                computeC += memoryBandwidthPE(cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
-                AccessByte += (cntc * 3 + 2) * (sim.cfg.jjj / mergecnt);
+                computeDramAccess += memoryBandwidthPE(cntc * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords) * (sim.cfg.jjj / mergecnt);
+                computeC += memoryBandwidthPE(cntc * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords) * (sim.cfg.jjj / mergecnt);
+                AccessByte += (cntc * sim.cfg.elem_nwords + sim.cfg.elem_data_nwords) * (sim.cfg.jjj / mergecnt);
             }
         }
     }
@@ -1559,9 +1559,9 @@ void postTileMerge() {
     //     for (int ii = 0; ii < sim.cfg.I; ii++) {
     //         int cntc = getcntc(ii);
 
-    //         computeDramAccess += memoryBandwidthPE(cntc * 3);
-    //         postC += memoryBandwidthPE(cntc * 3);
-    //         AccessByte += cntc * 3;
+    //         computeDramAccess += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+    //         postC += memoryBandwidthPE(cntc * sim.cfg.elem_nwords);
+    //         AccessByte += cntc * sim.cfg.elem_nwords;
     //     }
     // }
 
@@ -1572,9 +1572,9 @@ void postTileMerge() {
 
             int cntc = getcntc(ii);
 
-            postDramAccess += memoryBandwidthPE(cntc * 3) * (sim.cfg.ttj);
-            postC += memoryBandwidthPE(cntc * 3) * (sim.cfg.ttj);
-            AccessByte += cntc * 3 * sim.cfg.ttj;
+            postDramAccess += memoryBandwidthPE(cntc * sim.cfg.elem_nwords) * (sim.cfg.ttj);
+            postC += memoryBandwidthPE(cntc * sim.cfg.elem_nwords) * (sim.cfg.ttj);
+            AccessByte += cntc * sim.cfg.elem_nwords * sim.cfg.ttj;
         }
         //   analyze_statistics();
     }

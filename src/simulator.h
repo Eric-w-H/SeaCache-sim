@@ -6,6 +6,9 @@ struct config {
     u32 elem_coord_nbytes;
     u32 elem_nbytes;
 
+    u32 elem_data_nwords;
+    u32 elem_nwords;
+
     enum DataFlow   dataflow;
     enum InterOrder interorder;
     enum Format     format;
