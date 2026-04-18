@@ -430,6 +430,8 @@ int main(int argc, char *argv[])
         sim.cursor.A    = (struct tile) {
             .major_dim      = sim.cfg.iii,
             .minor_dim      = sim.cfg.jjj,
+            .major_mat_dim  = sim.cfg.I,
+            .minor_mat_dim  = sim.cfg.J,
             .map            = (const Coord **)A,
             .offsets        = (const Coord *)offsetarrayA,
             .minor_wrap     = &sim.cursor.wrap_tj,
@@ -440,6 +442,8 @@ int main(int argc, char *argv[])
         sim.cursor.B    = (struct tile) {
             .major_dim      = sim.cfg.jjj,
             .minor_dim      = sim.cfg.kkk,
+            .major_mat_dim  = sim.cfg.I,
+            .minor_mat_dim  = sim.cfg.K,
             .map            = (const Coord **)B,
             .offsets        = (const Coord *)offsetarrayB,
             .minor_wrap     = &sim.cursor.wrap_tk,

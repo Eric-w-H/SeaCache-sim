@@ -28,6 +28,7 @@ struct config {
 struct tile {
     // constants
     Coord major_dim, minor_dim;
+    Coord major_mat_dim, minor_mat_dim;
         // - will equal pair of _tile_dim's
         // - assert(A.major_dim == B.minor_dim)
     const Coord **map, *offsets;// compressed sparse major -> minor map (e.g. CSR/CSC)
