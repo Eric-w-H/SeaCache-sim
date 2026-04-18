@@ -2,6 +2,7 @@
 # Constants
 ###################################################
 TARGET := scache
+DEBUG_TARGET := scache_debug
 
 SRC_DIRS := ./src
 BUILD_DIR := ./build
@@ -61,7 +62,7 @@ $(foreach f,$(SRC),$(eval $(call OBJ_COMP_TEMPLATE,$(BUILD_DIR),$(f),$(CPPFLAGS)
 # Debug targets
 #-------------------------------------------------- 
 debug: $(DEBUG_DIR)/$(TARGET) | $(DEBUG_DIR) $(OUTPUT_DIR)
-	cp $(DEBUG_DIR)/$(TARGET) ./$(TARGET)
+	cp $(DEBUG_DIR)/$(TARGET) ./$(DEBUG_TARGET)
 
 $(DEBUG_DIR)/$(TARGET): $(DEBUG_OBJS) | $(DEBUG_DIR)
 	g++ $(DEBUG_CPPFLAGS) $(DEBUG_OBJS) -o $(DEBUG_DIR)/$(TARGET)

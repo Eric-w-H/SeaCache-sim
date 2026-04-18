@@ -47,9 +47,9 @@ void compute_tile_luts(struct tile *t, b16 reset_begins)
         memset(begins, 0, major_dim*sizeof(*sizes));
 
     Coord abs_rj_lim= minor_idx + minor_dim;
-    for (Coord ri = 0; ri < major_dim; ++ri) {
+    for (Coord ri = 0; ri < major_dim - 1; ++ri) {
         Coord abs_ri        = major_idx + ri;
-        Coord nzero_elem_cnt= offsets[abs_ri+1] - offsets[abs_ri];
+        i64 nzero_elem_cnt = static_cast<i64>(offsets[abs_ri+1]) - offsets[abs_ri];
 
         Coord rj        = begins[ri];
         while (rj < nzero_elem_cnt && map[abs_ri][rj] < minor_idx)

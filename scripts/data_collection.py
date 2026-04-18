@@ -286,7 +286,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--bandwidth-values", default="68")
     p.add_argument("--pecnt-values", default="64")
     p.add_argument("--srambank-values", default="64")
-    p.add_argument("--baseline-values", default="0")
+    p.add_argument("--baseline-values", default="1")
     p.add_argument("--condensed-values", default="0")
 
 
@@ -363,7 +363,7 @@ def main(argv: Sequence[str]) -> int:
     total_jobs = len(valid_matrices) * len(configs)
     done_jobs = 0
 
-    with concurrent.futures.ThreadPoolExecutor(8) as pool:
+    with concurrent.futures.ThreadPoolExecutor(4) as pool:
         jobs = {}
         for matrix in valid_matrices:
             mtx_path = matrix_file_path(matrix, matrix_roots)
