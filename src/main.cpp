@@ -476,6 +476,23 @@ int main(int argc, char *argv[])
     if (baselinetest) {
         // EWH
         // Incorporate SeaCache into baseline
+        puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
+
+        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
+            matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+            matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
+        );
+
+        ISCACHE = 1;
+        cache.cfg.cache_nwords        = input_cfg_cache_nwords;
+        cache.cfg.scheme              = CACHE_SCHEME_FLFU_DENSE;
+        setSET(16*4);
+        adaptive_prefetch   = 1;
+        useVirtualTag       = 1;
+
+        reset_cursor(&sim.cursor);
+        runTile(sim.cfg.kkk);
+
         puts("***************** SeaCache *******************");
         printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
             matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
@@ -484,7 +501,7 @@ int main(int argc, char *argv[])
 
         ISCACHE = 1;
         cache.cfg.cache_nwords        = input_cfg_cache_nwords;
-        cache.cfg.scheme    = CACHE_SCHEME_FLFU_DENSE;
+        cache.cfg.scheme              = CACHE_SCHEME_FLFU;
         setSET(16*4);
         adaptive_prefetch   = 1;
         useVirtualTag       = 1;
@@ -552,25 +569,6 @@ int main(int argc, char *argv[])
 
         reset_cursor(&sim.cursor);
         run();
-    }
-
-    if (!baselinetest) {
-        puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 !!!!!!!!!!!!!!!!!!!!");
-
-        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
-            matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
-            matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
-        );
-
-        ISCACHE = 1;
-        cache.cfg.cache_nwords        = input_cfg_cache_nwords;
-        cache.cfg.scheme    = CACHE_SCHEME_FLFU_DENSE;
-        setSET(16*4);
-        adaptive_prefetch   = 1;
-        useVirtualTag       = 1;
-
-        reset_cursor(&sim.cursor);
-        runTile(sim.cfg.kkk);
     }
 
     return 0;

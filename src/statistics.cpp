@@ -23,6 +23,8 @@ long long preA, preB, postC;
 
 long long AccessByte = 0;
 
+long long dense_hit, dense_store = 0;
+
 void analyze_statistics() {
 
     printf("total cycle = %lld\nload cycle = %lld, multiply cycle = %lld, "
@@ -46,4 +48,7 @@ void analyze_statistics() {
            "total DRAM access C = %lld \n",
            totalA, totalB, totalC);
     printf("hitrate = %lf  \n", (totalhit) / ((f64)totalaccess));
+    printf("dense rate = %lf\n", dense_hit / static_cast<f64>(totalhit));
+    printf("dense store = %lld\n", dense_store);
+    printf("dense hit/store = %lf\n", dense_hit / static_cast<f64>(dense_store));
 }

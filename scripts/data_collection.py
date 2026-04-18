@@ -282,12 +282,18 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
     # Used only when --profile full
     p.add_argument("--transpose-values", default="0")
-    p.add_argument("--cachesize-values", default="1,2,4")
-    p.add_argument("--bandwidth-values", default="34,68,136")
-    p.add_argument("--pecnt-values", default="16,32,64")
-    p.add_argument("--srambank-values", default="16,32,64")
-    p.add_argument("--baseline-values", default="0,1")
+    p.add_argument("--cachesize-values", default="4")
+    p.add_argument("--bandwidth-values", default="68")
+    p.add_argument("--pecnt-values", default="64")
+    p.add_argument("--srambank-values", default="64")
+    p.add_argument("--baseline-values", default="0")
     p.add_argument("--condensed-values", default="0")
+
+
+    # p.add_argument("--cachesize-values", default="1,2,4")
+    # p.add_argument("--bandwidth-values", default="34,68,136")
+    # p.add_argument("--pecnt-values", default="16,32,64")
+    # p.add_argument("--srambank-values", default="16,32,64")
 
     return p.parse_args(argv)
 
@@ -380,7 +386,12 @@ def main(argv: Sequence[str]) -> int:
                                     dry_run=args.dry_run,
                                  )] = (matrix, cfg)
 
-    for future in tqdm(concurrent.futures.as_completed(jobs), total=len(jobs)):
+    done_jobs = 0
+    for future in concurrent.futures.as_completed(jobs):
+        done_jobs += 1
+        print(
+            f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> finished"
+        )
         status, returncode, out_path, cmd = future.result()
         matrix, cfg = jobs[future]
         row: Dict[str, object] = {

@@ -820,12 +820,14 @@ bool cache_read_flfu_dense(u64 addr)
     if (cache_hit_flfu_dense(addr)) {
         totalhit++;
         data_access_hit++;
+	dense_hit++;
         // sram read
         computeSramAccess += sramReadBandwidth(cache.cfg.block_nwords);
         return 1;
     }
     // cache miss
     else {
+	dense_store++;
         // dram load
         computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
         // sram write
@@ -1148,14 +1150,13 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
                 nelems_consumed = nelems_sparse_line;
                 tmpaddr         = getCacheAddr(jj, lines_consumed);
                 tmphit          = cacheReadPracticalLFU(tmpaddr, e == 0, getCacheAddr(jj, 0));
-
+                ++lines_consumed;
             }
 
             if (!tmphit)
                 anymiss = 1;
 
             e += nelems_consumed;
-            ++lines_consumed;
         }
 
         if (anymiss) {
