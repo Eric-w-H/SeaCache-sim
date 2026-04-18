@@ -386,41 +386,43 @@ def main(argv: Sequence[str]) -> int:
                                     dry_run=args.dry_run,
                                  )] = (matrix, cfg)
 
-    done_jobs = 0
-    for future in concurrent.futures.as_completed(jobs):
-        done_jobs += 1
-        print(
-            f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> finished"
-        )
-        status, returncode, out_path, cmd = future.result()
-        matrix, cfg = jobs[future]
-        row: Dict[str, object] = {
-            "matrix": matrix,
-            "matrix_file": str(mtx_path),
-            "config_file": str(cfg_path),
-            "status": status,
-            "returncode": returncode,
-            "command": cmd,
-            "output_file": str(out_path) if out_path else "",
-            "transpose": cfg.transpose,
-            "cachesize": cfg.cachesize,
-            "memorybandwidth": cfg.memorybandwidth,
-            "PEcnt": cfg.pecnt,
-            "srambank": cfg.srambank,
-            "baselinetest": cfg.baselinetest,
-            "data_bytes": cfg.data_bytes,
-            "coord_bytes": cfg.coord_bytes,
-            "condensedOP": int(cfg.condensedop),
-        }
+        done_jobs = 0
+        for future in tqdm(concurrent.futures.as_completed(jobs), total=len(jobs)):
+            done_jobs += 1
+            # print(
+            #     f"[{done_jobs}/{total_jobs}] matrix={matrix} cfg={cfg.tag()} -> finished"
+            # )
+            status, returncode, out_path, cmd = future.result()
+            if status != 'ok':
+                print('[!] FAULT:', status, returncode, cmd)
+            matrix, cfg = jobs[future]
+            row: Dict[str, object] = {
+                "matrix": matrix,
+                "matrix_file": str(mtx_path),
+                "config_file": str(cfg_path),
+                "status": status,
+                "returncode": returncode,
+                "command": cmd,
+                "output_file": str(out_path) if out_path else "",
+                "transpose": cfg.transpose,
+                "cachesize": cfg.cachesize,
+                "memorybandwidth": cfg.memorybandwidth,
+                "PEcnt": cfg.pecnt,
+                "srambank": cfg.srambank,
+                "baselinetest": cfg.baselinetest,
+                "data_bytes": cfg.data_bytes,
+                "coord_bytes": cfg.coord_bytes,
+                "condensedOP": int(cfg.condensedop),
+            }
 
-        if out_path and out_path.exists() and not args.dry_run:
-            text = out_path.read_text(encoding="utf-8", errors="ignore")
-            row.update(extract_metrics(text))
-        else:
-            for key in METRIC_PATTERNS:
-                row[key] = None
+            if out_path and out_path.exists() and not args.dry_run:
+                text = out_path.read_text(encoding="utf-8", errors="ignore")
+                row.update(extract_metrics(text))
+            else:
+                for key in METRIC_PATTERNS:
+                    row[key] = None
 
-        rows.append(row)
+            rows.append(row)
 
     write_csv(rows, results_csv)
     print(f"[{datetime.now().isoformat(timespec='seconds')}] Wrote {len(rows)} rows to {results_csv}")
