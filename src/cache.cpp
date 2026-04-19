@@ -44,7 +44,7 @@ int *LFUtag = nullptr;
 // short *partialValid = nullptr;
 
 // for the pack&split
-const int N_TAG_L_BITS = 0; // Tag-L bits
+const int N_TAG_L_BITS = 4; // Tag-L bits
 
 u8  *Cnt    = nullptr;
 u16 *PosOrig= nullptr;

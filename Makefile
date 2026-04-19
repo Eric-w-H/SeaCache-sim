@@ -17,7 +17,7 @@ OBJS := $(FILENAMES:%=$(BUILD_DIR)/%.o)
 DEBUG_OBJS := $(FILENAMES:%=$(DEBUG_DIR)/%.o)
 
 # Flags for g++
-CPPFLAGS := -O3 -Wall -Wextra -std=c++2a
+CPPFLAGS := -O2 -Wall -Wextra -std=c++2a
 DEBUG_CPPFLAGS := $(CPPFLAGS) -g
 
 # Phony targets (do not represent a file)
