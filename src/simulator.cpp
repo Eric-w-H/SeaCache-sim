@@ -1493,6 +1493,8 @@ void reinitialize() {
     data_access_total = 0;
     dense_hit = 0;
     dense_store = 0;
+    dense_replaced_sparse = 0;
+    sparse_replaced_dense = 0;
 
     postDramAccess = postSramAccess = 0;
 

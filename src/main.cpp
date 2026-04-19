@@ -491,6 +491,23 @@ int main(int argc, char *argv[])
         cache.cfg.cache_nwords        = input_cfg_cache_nwords;
         cache.cfg.scheme              = CACHE_SCHEME_FLFU_DENSE;
         setSET(16*4);
+        adaptive_prefetch   = 0;
+        useVirtualTag       = 0;
+
+        reset_cursor(&sim.cursor);
+        runTile(sim.cfg.kkk);
+
+        puts("\n!!!!!!!!!!!!!!!!!!!! EECS570 - DENSE !!!!!!!!!!!!!!!!!!!!");
+
+        printf("nnzB:%u  K:%u  J/TJ:%u  nzlB:%u\n",
+            matB.nzM, sim.cfg.K, (sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj,
+            matB.nzM / (sim.cfg.K * ((sim.cfg.J + sim.cfg.jjj - 1) / sim.cfg.jjj))
+        );
+
+        ISCACHE = 1;
+        cache.cfg.cache_nwords        = input_cfg_cache_nwords;
+        cache.cfg.scheme              = CACHE_SCHEME_DENSE;
+        setSET(16*4);
         adaptive_prefetch   = 1;
         useVirtualTag       = 1;
 

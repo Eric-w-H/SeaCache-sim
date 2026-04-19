@@ -23,7 +23,7 @@ extern long long preA, preB, postC;
 
 extern long long AccessByte;
 
-extern long long dense_hit, dense_store;
+extern long long dense_hit, dense_store, dense_replaced_sparse, sparse_replaced_dense;
 
 void analyze_statistics();
 
