@@ -4,10 +4,10 @@
     "memorybandwidth": 68,
     "PEcnt": 64,
     "srambank": 64,
-    "baselinetest": 0,
+    "baselinetest": 1,
     "condensedOP": false,
     "tileDir": "./tiles/",
-    "outputDir": "./output/",
-    "elemDataBytes": 8,
+    "outputDir": "./output_sweep/",
+    "elemDataBytes": 4,
     "coordDataBytes": 4
 }

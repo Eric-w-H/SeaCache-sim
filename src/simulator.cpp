@@ -1491,6 +1491,8 @@ void reinitialize() {
     data_access_hit = 0;
     totalaccess = 0;
     data_access_total = 0;
+    dense_hit = 0;
+    dense_store = 0;
 
     postDramAccess = postSramAccess = 0;
 

@@ -1,6 +1,5 @@
 data/**
-output3/**
-output/**
+output*/**
 *.[Oo]
 *.out
 *.exe
