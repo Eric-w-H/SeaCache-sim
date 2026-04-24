@@ -1067,20 +1067,20 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
     // tag can be configured or not (baseline)) the flu information is no longer
     // kept in the LFUtag, but the extra lfubit
     if (cache.cfg.scheme == CACHE_SCHEME_FLFU) {
-        bool anymiss = 0;
+        unsigned anymiss = 0;
         fibersize = (sim.cursor.B.sizes[jj - TJ] * sim.cfg.elem_nbytes + 3) / 4;
         for (int tmpcurr = 0; tmpcurr < fibersize; tmpcurr += cache.cfg.block_nwords) {
             long long tmpaddr = getCacheAddr(jj, tmpcurr / cache.cfg.block_nwords);
             bool tmphit = cacheReadPracticalLFU(tmpaddr, tmpcurr == 0, getCacheAddr(jj, 0));
             if (!tmphit) {
-                anymiss = 1;
+                anymiss += 1;
             }
         }
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords * anymiss);
 
-            computeB += memoryBandwidthPE(cache.cfg.block_nwords);
+            computeB += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
         }
     }
 
@@ -1102,7 +1102,7 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         // }
 
         const u32 ndense_elems_per_line = cache.cfg.block_nbytes / sim.cfg.elem_data_nbytes;
-        b8 anymiss          = 0;
+        unsigned anymiss          = 0;
         const Coord *fiber_ks= sim.cursor.B.map[jj - TJ] + sim.cursor.B.begins[jj - TJ];
         Coord fiber_nelems  = sim.cursor.B.sizes[jj - TJ];
         Coord e             = 0;
@@ -1135,16 +1135,16 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
             }
 
             if (!tmphit)
-                anymiss = 1;
+                anymiss += 1;
 
             e += nelems_consumed;
         }
 
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords * anymiss);
 
-            computeB += memoryBandwidthPE(cache.cfg.block_nwords);
+            computeB += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
         }
     }
 
@@ -1165,8 +1165,8 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
         //     computeB += memoryBandwidthPE(cache.cfg.block_nwords);
         // }
 
-        const u32 ndense_elems_per_line = cache.cfg.block_nbytes / sim.cfg.elem_data_nbytes;
-        b8 anymiss          = 0;
+        const u32 ndense_elems_per_line = 4 * cache.cfg.block_nwords / (sim.cfg.elem_nbytes + sim.cfg.elem_coord_nbytes + 3);
+        unsigned anymiss          = 0;
         const Coord *fiber_ks= sim.cursor.B.map[jj - TJ] + sim.cursor.B.begins[jj - TJ];
         Coord fiber_nelems  = sim.cursor.B.sizes[jj - TJ];
         Coord e             = 0;
@@ -1186,16 +1186,16 @@ __attribute__((noinline)) void cacheAccessFiber(int jj, int fibersize, int ii) {
             tmphit          = cache_read_flfu_dense(tmpaddr);
 
             if (!tmphit)
-                anymiss = 1;
+                anymiss +=1;
 
             e += nelems_consumed;
         }
 
         if (anymiss) {
-            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords);
-            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords);
+            computeDramAccess += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
+            computeSramAccess += sramWriteBandwidth(cache.cfg.block_nwords * anymiss);
 
-            computeB += memoryBandwidthPE(cache.cfg.block_nwords);
+            computeB += memoryBandwidthPE(cache.cfg.block_nwords * anymiss);
         }
     }
 }
